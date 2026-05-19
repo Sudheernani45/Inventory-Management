@@ -1,0 +1,39 @@
+{% extends "manager/base.html" %}
+{% block title %}My Site{% endblock %}
+{% block page_title %}<i class="fas fa-store" style="color:var(--accent);margin-right:8px"></i>My Site{% endblock %}
+{% block content %}
+<div class="card" style="max-width:700px">
+  <div class="card-header">
+    <div class="card-title"><i class="fas fa-store" style="color:var(--accent)"></i> Site Details</div>
+    <span class="badge badge-gray" style="font-size:.7rem">View Only</span>
+  </div>
+  <div id="siteDetails"><div class="empty-state"><span class="spinner"></span></div></div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(async()=>{
+  const {ok,data}=await apiFetch('/manager/api/site');
+  const el=document.getElementById('siteDetails');
+  if(!ok||!data.site){el.innerHTML='<div class="empty-state"><i class="fas fa-store"></i><p>No site assigned to your account</p></div>';return;}
+  const s=data.site;
+  el.innerHTML=`
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+      ${field('Site ID',`<span style="font-family:monospace;color:var(--accent);font-weight:700">${s.site_id}</span>`)}
+      ${field('Site Name',s.site_name)}
+      ${field('Format',s.site_format?`<span class="badge badge-purple">${s.site_format}</span>`:'—')}
+      ${field('Status',`<span class="badge ${s.status==='Active'?'badge-green':'badge-gray'}">${s.status||'—'}</span>`)}
+      ${field('Region',s.region)}
+      ${field('City',s.city)}
+      ${field('Store Size',s.store_size?Number(s.store_size).toLocaleString()+' sqft':'—')}
+      ${field('Open Date',s.open_date||'—')}
+    </div>`;
+})();
+function field(label,val){
+  return `<div style="background:var(--surface2);border-radius:10px;padding:14px">
+    <div style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:5px">${label}</div>
+    <div style="font-weight:500">${val||'—'}</div>
+  </div>`;
+}
+</script>
+{% endblock %}

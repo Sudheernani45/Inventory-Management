@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>{{ inv_number }} — InventoryIQ</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap');
+
+    :root {
+      --brand-dark:   #0b1f3a;
+      --brand-mid:    #0e3d6e;
+      --brand-light:  #1565c0;
+      --brand-accent: #2196f3;
+      --brand-glow:   rgba(33,150,243,.12);
+      --success:      #00c853;
+      --warning:      #ff9800;
+      --danger:       #f44336;
+      --text:         #0d1b2a;
+      --text-muted:   #607d8b;
+      --border:       #e3eaf2;
+      --surface:      #f7fafd;
+      --white:        #ffffff;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background: var(--surface);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 30px 16px 60px;
+    }
+
+    /* ── Toolbar ── */
+    .toolbar {
+      width: 100%;
+      max-width: 860px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .toolbar-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: .82rem;
+      color: var(--text-muted);
+    }
+    .toolbar-brand span { font-weight: 700; color: var(--brand-light); }
+    .toolbar-actions { display: flex; gap: 8px; }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 9px 18px;
+      border-radius: 10px;
+      font-family: inherit;
+      font-size: .82rem;
+      font-weight: 700;
+      cursor: pointer;
+      border: none;
+      transition: all .18s;
+      text-decoration: none;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--brand-light), var(--brand-accent));
+      color: #fff;
+      box-shadow: 0 4px 16px rgba(33,150,243,.3);
+    }
+    .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 22px rgba(33,150,243,.4); }
+    .btn-ghost {
+      background: var(--white);
+      color: var(--text-muted);
+      border: 1.5px solid var(--border);
+    }
+    .btn-ghost:hover { background: var(--surface); color: var(--text); border-color: #b0c4d8; }
+
+    /* ── Invoice Card ── */
+    .invoice-card {
+      width: 100%;
+      max-width: 860px;
+      background: var(--white);
+      border-radius: 20px;
+      box-shadow: 0 8px 48px rgba(11,31,58,.1), 0 1px 4px rgba(11,31,58,.06);
+      overflow: hidden;
+    }
+
+    /* ── Header ── */
+    .inv-header {
+      background: linear-gradient(135deg, var(--brand-dark) 0%, var(--brand-mid) 60%, var(--brand-light) 100%);
+      padding: 36px 44px 30px;
+      position: relative;
+      overflow: hidden;
+    }
+    .inv-header::before {
+      content: '';
+      position: absolute;
+      top: -60px; right: -60px;
+      width: 260px; height: 260px;
+      border-radius: 50%;
+      background: rgba(255,255,255,.04);
+    }
+    .inv-header::after {
+      content: '';
+      position: absolute;
+      bottom: -80px; left: 40%;
+      width: 320px; height: 320px;
+      border-radius: 50%;
+      background: rgba(33,150,243,.08);
+    }
+    .inv-header-inner {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+
+    .brand-block {}
+    .brand-logo {
+      font-size: 1.55rem;
+      font-weight: 800;
+      color: #fff;
+      letter-spacing: -.5px;
+    }
+    .brand-logo span { color: var(--brand-accent); }
+    .brand-tagline {
+      font-size: .62rem;
+      color: rgba(255,255,255,.55);
+      text-transform: uppercase;
+      letter-spacing: .18em;
+      margin-top: 3px;
+    }
+    .brand-contact {
+      margin-top: 14px;
+      font-size: .75rem;
+      color: rgba(255,255,255,.7);
+      line-height: 1.75;
+    }
+    .brand-contact strong { color: rgba(255,255,255,.9); }
+
+    .inv-meta-block { text-align: right; }
+    .inv-type-badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 20px;
+      background: rgba(255,255,255,.12);
+      border: 1px solid rgba(255,255,255,.2);
+      font-size: .62rem;
+      font-weight: 700;
+      color: rgba(255,255,255,.85);
+      text-transform: uppercase;
+      letter-spacing: .15em;
+      margin-bottom: 8px;
+    }
+    .inv-number {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: #fff;
+      line-height: 1.2;
+    }
+    .inv-date {
+      font-size: .75rem;
+      color: rgba(255,255,255,.6);
+      margin-top: 6px;
+    }
+    .status-pill {
+      display: inline-block;
+      margin-top: 10px;
+      padding: 5px 14px;
+      border-radius: 20px;
+      font-size: .7rem;
+      font-weight: 700;
+      letter-spacing: .05em;
+      text-transform: uppercase;
+    }
+    .status-shipped, .status-received, .status-approved, .status-delivered {
+      background: rgba(0,200,83,.18);
+      color: #00e676;
+      border: 1px solid rgba(0,200,83,.3);
+    }
+    .status-pending {
+      background: rgba(255,152,0,.18);
+      color: #ffb74d;
+      border: 1px solid rgba(255,152,0,.3);
+    }
+    .status-cancelled {
+      background: rgba(244,67,54,.18);
+      color: #ef9a9a;
+      border: 1px solid rgba(244,67,54,.3);
+    }
+    .status-dispatched, .status-confirmed, .status-processing {
+      background: rgba(33,150,243,.18);
+      color: #90caf9;
+      border: 1px solid rgba(33,150,243,.3);
+    }
+    .status-draft {
+      background: rgba(176,190,197,.18);
+      color: #b0bec5;
+      border: 1px solid rgba(176,190,197,.3);
+    }
+
+    /* ── Info Columns ── */
+    .inv-info-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0;
+      border-bottom: 1.5px solid var(--border);
+    }
+    .inv-info-col {
+      padding: 22px 28px;
+      border-right: 1px solid var(--border);
+    }
+    .inv-info-col:last-child { border-right: none; }
+    .inv-info-label {
+      font-size: .6rem;
+      font-weight: 700;
+      color: var(--brand-accent);
+      text-transform: uppercase;
+      letter-spacing: .14em;
+      margin-bottom: 8px;
+    }
+    .inv-info-col h3 {
+      font-size: .88rem;
+      font-weight: 800;
+      color: var(--text);
+      margin-bottom: 3px;
+    }
+    .inv-info-col p {
+      font-size: .75rem;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+    .inv-info-col p strong { color: var(--text); }
+
+    /* ── Line Items Table ── */
+    .inv-body { padding: 28px 44px; }
+    .section-title {
+      font-size: .62rem;
+      font-weight: 800;
+      color: var(--brand-accent);
+      text-transform: uppercase;
+      letter-spacing: .16em;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .section-title::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    .items-table {
+      width: 100%;
+      border-collapse: collapse;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1.5px solid var(--border);
+    }
+    .items-table thead tr {
+      background: var(--brand-dark);
+    }
+    .items-table thead th {
+      padding: 13px 18px;
+      font-size: .66rem;
+      font-weight: 700;
+      color: rgba(255,255,255,.8);
+      text-transform: uppercase;
+      letter-spacing: .12em;
+      text-align: left;
+    }
+    .items-table thead th:last-child { text-align: right; }
+    .items-table thead th.center { text-align: center; }
+
+    .items-table tbody tr {
+      border-bottom: 1px solid var(--border);
+      transition: background .12s;
+    }
+    .items-table tbody tr:last-child { border-bottom: none; }
+    .items-table tbody tr:hover { background: var(--surface); }
+    .items-table tbody td {
+      padding: 15px 18px;
+      font-size: .82rem;
+      vertical-align: middle;
+    }
+    .items-table tbody td:last-child { text-align: right; font-weight: 700; }
+    .items-table tbody td.center { text-align: center; }
+
+    .product-name {
+      font-weight: 700;
+      color: var(--text);
+      font-size: .84rem;
+    }
+    .product-id {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: .68rem;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+    .unit-chip {
+      display: inline-block;
+      padding: 2px 9px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: .72rem;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+
+    /* ── Totals ── */
+    .inv-totals-row {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 24px;
+    }
+    .inv-totals-box {
+      width: 100%;
+      max-width: 320px;
+      background: var(--surface);
+      border: 1.5px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+    }
+    .totals-line {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 11px 20px;
+      border-bottom: 1px solid var(--border);
+      font-size: .82rem;
+    }
+    .totals-line:last-child { border-bottom: none; }
+    .totals-line .label { color: var(--text-muted); font-weight: 500; }
+    .totals-line .value { font-weight: 700; color: var(--text); font-family: 'JetBrains Mono', monospace; font-size: .8rem; }
+    .totals-line.discount .value { color: #e53935; }
+    .totals-grand {
+      background: var(--brand-dark);
+      padding: 16px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .totals-grand .label { color: rgba(255,255,255,.8); font-weight: 600; font-size: .84rem; }
+    .totals-grand .value {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 1.08rem;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    /* ── Footer ── */
+    .inv-footer {
+      padding: 24px 44px;
+      border-top: 1.5px solid var(--border);
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 24px;
+      flex-wrap: wrap;
+    }
+    .inv-footer-terms {
+      flex: 1;
+      min-width: 240px;
+    }
+    .inv-footer-terms h4 {
+      font-size: .72rem;
+      font-weight: 800;
+      color: var(--text);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+    }
+    .inv-footer-terms p {
+      font-size: .72rem;
+      color: var(--text-muted);
+      line-height: 1.65;
+    }
+    .inv-footer-sign {
+      text-align: right;
+    }
+    .sign-line {
+      width: 160px;
+      height: 1.5px;
+      background: var(--text);
+      margin-bottom: 6px;
+      margin-left: auto;
+    }
+    .sign-label {
+      font-size: .72rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .sign-sub {
+      font-size: .68rem;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    /* ── Page Footer Strip ── */
+    .inv-strip {
+      background: var(--brand-dark);
+      padding: 12px 44px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .inv-strip p {
+      font-size: .68rem;
+      color: rgba(255,255,255,.45);
+    }
+    .inv-strip span {
+      font-size: .72rem;
+      font-weight: 700;
+      color: var(--brand-accent);
+      letter-spacing: -.2px;
+    }
+
+    /* ── Watermark note ── */
+    .computer-gen {
+      text-align: center;
+      padding: 12px;
+      font-size: .68rem;
+      color: var(--text-muted);
+      font-style: italic;
+    }
+
+    /* ── Print styles ── */
+    @media print {
+      body { background: #fff; padding: 0; }
+      .toolbar { display: none !important; }
+      .invoice-card { border-radius: 0; box-shadow: none; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Toolbar ── -->
+<div class="toolbar no-print">
+  <div class="toolbar-brand">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+      <rect width="24" height="24" rx="7" fill="#1565c0"/>
+      <path d="M6 8h12M6 12h8M6 16h10" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/>
+    </svg>
+    <span>InventoryIQ</span> &nbsp;/&nbsp; {{ inv_number }}
+  </div>
+  <div class="toolbar-actions">
+    <button class="btn btn-ghost" onclick="window.history.back()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M19 12H5M5 12l7-7M5 12l7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      Back
+    </button>
+    <button class="btn btn-primary" onclick="downloadPDF()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 3v13M7 11l5 5 5-5M3 18v1a2 2 0 002 2h14a2 2 0 002-2v-1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      Download / Save as PDF
+    </button>
+  </div>
+</div>
+
+<!-- ── Invoice Card ── -->
+<div class="invoice-card" id="invoiceCard">
+
+  <!-- Header -->
+  <div class="inv-header">
+    <div class="inv-header-inner">
+      <div class="brand-block">
+        <div class="brand-logo">Inventory<span>IQ</span></div>
+        <div class="brand-tagline">Smart Inventory Management Platform</div>
+        <div class="brand-contact">
+          MITRAz Foundation<br>
+          Anantapur, Andhra Pradesh, India<br>
+          <strong>support@inventoryiq.in</strong> &nbsp;·&nbsp; +91 63025 44324
+        </div>
+      </div>
+      <div class="inv-meta-block">
+        <div class="inv-type-badge">{{ invoice_type }}</div>
+        <div class="inv-number">{{ inv_number }}</div>
+        <div class="inv-date">Generated: {{ generated_date }}</div>
+        {% set sl = status | lower %}
+        <div class="status-pill status-{{ sl }}">{{ status }}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Info Row -->
+  <div class="inv-info-row">
+
+    <!-- Bill To / Supplier -->
+    <div class="inv-info-col">
+      <div class="inv-info-label">{% if is_purchase is defined and is_purchase %}Supplier{% else %}Bill To{% endif %}</div>
+      {% if is_purchase is defined and is_purchase %}
+        <h3>{{ bill_to.name }}</h3>
+        <p>
+          {% if bill_to.email %}<strong>{{ bill_to.email }}</strong><br>{% endif %}
+          {% if bill_to.id %}Supplier ID: <strong>{{ bill_to.id }}</strong>{% endif %}
+        </p>
+      {% else %}
+        <h3>{{ bill_to.name or bill_to.customer_id }}</h3>
+        <p>
+          {% if bill_to.email %}<strong>{{ bill_to.email }}</strong><br>{% endif %}
+          {% if bill_to.customer_id %}Customer ID: <strong>{{ bill_to.customer_id }}</strong>{% endif %}
+          {% if bill_to.state %}<br>{{ bill_to.state }}{% endif %}
+        </p>
+      {% endif %}
+    </div>
+
+    <!-- Dispatch Warehouse -->
+    <div class="inv-info-col">
+      <div class="inv-info-label">Dispatch Warehouse</div>
+      <h3>{{ warehouse.site_name or ('Digital ' + warehouse.city) if warehouse.city else warehouse.site_id }}</h3>
+      <p>
+        Site ID: <strong>{{ warehouse.site_id }}</strong><br>
+        {% if warehouse.city %}{{ warehouse.city }}{% endif %}{% if warehouse.region %}, {{ warehouse.region }}{% endif %}
+      </p>
+    </div>
+
+    <!-- Order Details -->
+    <div class="inv-info-col">
+      <div class="inv-info-label">Order Details</div>
+      <h3>{{ order_ref }}</h3>
+      <p>
+        Order Date: <strong>{{ order_date }}</strong><br>
+        {% if shipped_date %}
+          {% if is_purchase is defined and is_purchase %}
+            Received Date: <strong>{{ shipped_date }}</strong><br>
+          {% else %}
+            Shipped Date: <strong>{{ shipped_date }}</strong><br>
+          {% endif %}
+        {% endif %}
+        Status: <strong>{{ status }}</strong>
+      </p>
+    </div>
+
+  </div>
+
+  <!-- Body -->
+  <div class="inv-body">
+
+    <div class="section-title">Line Items — {{ items|length }} product{% if items|length != 1 %}s{% endif %}</div>
+
+    <table class="items-table">
+      <thead>
+        <tr>
+          <th style="width:36px">#</th>
+          <th>Product Description</th>
+          <th class="center">Unit</th>
+          <th class="center">Qty</th>
+          <th class="center">Unit Price</th>
+          <th>Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in items %}
+        <tr>
+          <td style="color:var(--text-muted);font-size:.76rem;font-weight:600">{{ loop.index }}</td>
+          <td>
+            <div class="product-name">{{ item.product_name or item.product_id or '—' }}</div>
+            {% if item.product_id %}
+            <div class="product-id">{{ item.product_id }}</div>
+            {% endif %}
+          </td>
+          <td class="center"><span class="unit-chip">Unit</span></td>
+          <td class="center" style="font-weight:700">{{ item.quantity }}</td>
+          <td class="center" style="font-family:'JetBrains Mono',monospace;font-size:.8rem">₹{{ "%.2f"|format(item.unit_price|float) }}</td>
+          <td style="font-family:'JetBrains Mono',monospace;font-size:.85rem">
+            ₹{{ "{:,.2f}".format((item.quantity|float) * (item.unit_price|float)) }}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <!-- Totals -->
+    {% set gst_amount = (subtotal|float) * (gst_rate|float) / 100 %}
+    {% set total_payable = (subtotal|float) + gst_amount - (discount|float) %}
+
+    <div class="inv-totals-row">
+      <div class="inv-totals-box">
+        <div class="totals-line">
+          <span class="label">Subtotal</span>
+          <span class="value">₹{{ "{:,.2f}".format(subtotal|float) }}</span>
+        </div>
+        <div class="totals-line">
+          <span class="label">GST ({{ gst_rate }}%)</span>
+          <span class="value">₹{{ "{:,.2f}".format(gst_amount) }}</span>
+        </div>
+        <div class="totals-line discount">
+          <span class="label">Discount</span>
+          <span class="value">— ₹{{ "{:,.2f}".format(discount|float) }}</span>
+        </div>
+        <div class="totals-grand">
+          <span class="label">Total Payable</span>
+          <span class="value">₹{{ "{:,.2f}".format(total_payable) }}</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Footer -->
+  <div class="inv-footer">
+    <div class="inv-footer-terms">
+      <h4>Terms &amp; Conditions</h4>
+      <p>
+        Payment is due within 30 days of invoice date. Late payments attract 1.5% monthly interest.<br>
+        All disputes subject to jurisdiction of Anantapur courts. This is a computer-generated document.
+      </p>
+      {% if notes %}
+      <p style="margin-top:8px"><strong>Notes:</strong> {{ notes }}</p>
+      {% endif %}
+    </div>
+    <div class="inv-footer-sign">
+      <div class="sign-line"></div>
+      <div class="sign-label">Authorised Signatory</div>
+      <div class="sign-sub">InventoryIQ · MITRAz Foundation</div>
+    </div>
+  </div>
+
+  <!-- Strip -->
+  <div class="inv-strip">
+    <p>© 2026 InventoryIQ · MITRAz Foundation. All rights reserved.</p>
+    <span>InventoryIQ</span>
+  </div>
+
+</div>
+
+<div class="computer-gen">This is a computer-generated invoice. No signature required.</div>
+
+<script>
+function downloadPDF(){
+  // Use the browser's print-to-PDF with optimised settings
+  const toolbar=document.querySelector('.toolbar');
+  if(toolbar) toolbar.style.display='none';
+  window.print();
+  setTimeout(()=>{ if(toolbar) toolbar.style.display=''; }, 1200);
+}
+
+// Auto-set print title to invoice number
+document.title="{{ inv_number }} — InventoryIQ";
+</script>
+
+<style>
+@media print {
+  @page {
+    size: A4;
+    margin: 10mm 8mm;
+  }
+  body { padding: 0 !important; background: #fff !important; }
+  .toolbar { display: none !important; }
+  .computer-gen { display: none; }
+  .invoice-card {
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    max-width: 100% !important;
+  }
+}
+</style>
+</body>
+</html>

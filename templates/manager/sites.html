@@ -1,0 +1,203 @@
+{% extends "manager/base.html" %}
+{% block title %}Sites{% endblock %}
+{% block page_title %}<i class="fas fa-store" style="color:var(--accent);margin-right:8px"></i>Sites{% endblock %}
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <div style="display:flex;align-items:center;gap:12px">
+      <div class="card-title"><i class="fas fa-store" style="color:var(--accent)"></i> All Sites</div>
+      <span id="siteCount" class="badge badge-blue">—</span>
+    </div>
+    <div class="search-bar">
+      <div class="search-input-wrap">
+        <i class="fas fa-search"></i>
+        <input type="text" class="form-control" id="siteSearch" placeholder="Search sites…" oninput="filterSites()" style="width:220px"/>
+      </div>
+      <select class="form-control" id="statusFilter" onchange="filterSites()" style="width:140px">
+        <option value="">All Status</option>
+        <option value="Active">Active</option>
+        <option value="Inactive">Inactive</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- View-only notice -->
+  <div style="display:flex;align-items:center;gap:10px;background:rgba(13,148,136,.07);border:1px solid rgba(13,148,136,.2);border-radius:10px;padding:11px 16px;margin-bottom:18px;font-size:.82rem;color:var(--accent2)">
+    <i class="fas fa-eye"></i>
+    <span>You have <strong>view-only</strong> access to site information. Contact an administrator to make changes.</span>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Site ID</th><th>Name</th><th>Format</th><th>City</th>
+          <th>Status</th><th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="sitesTbody">
+        <tr><td colspan="9"><div class="empty-state"><span class="spinner"></span></div></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="pagination" id="sitePagination"></div>
+</div>
+
+<!-- VIEW SITE MODAL -->
+<div class="modal-overlay" id="viewSiteModal">
+  <div class="modal" style="max-width:500px">
+    <div class="modal-header">
+      <div class="modal-title"><i class="fas fa-store" style="color:var(--accent)"></i> Site Details</div>
+      <button class="modal-close" onclick="closeModal('viewSiteModal')">×</button>
+    </div>
+    <div id="viewSiteBody" style="padding:4px 0"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('viewSiteModal')">Close</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+let allSites = [];
+let filteredSites = [];
+const PER_PAGE = 15;
+let currentPage = 1;
+
+(function(){ loadSites(); })();  // FIX 5: non-blocking, no await
+
+async function loadSites(){
+  try {
+    const {ok, data} = await apiFetch('/api/sites-list');
+    if(!ok) { showToast('Error loading sites','error'); return; }
+    allSites = data.sites || [];
+    document.getElementById('siteCount').textContent = allSites.length;
+    filterSites();
+  } catch(e){ showToast('Error loading sites','error'); }
+}
+
+function filterSites(){
+  const q = document.getElementById('siteSearch').value.toLowerCase();
+  const st = document.getElementById('statusFilter').value;
+  filteredSites = allSites.filter(s =>
+    (!q || (s.site_id||'').toLowerCase().includes(q) || (s.site_name||'').toLowerCase().includes(q) ||
+            (s.city||'').toLowerCase().includes(q)    || (s.region||'').toLowerCase().includes(q)) &&
+    (!st || s.status === st)
+  );
+  currentPage = 1;
+  renderTable();
+}
+
+function renderTable(){
+  const tbody = document.getElementById('sitesTbody');
+  const start = (currentPage-1)*PER_PAGE;
+  const page  = filteredSites.slice(start, start+PER_PAGE);
+  const total = filteredSites.length;
+  if(!total){
+    tbody.innerHTML='<tr><td colspan="6"><div class="empty-state"><i class="fas fa-store"></i><p>No sites found</p></div></td></tr>';
+    document.getElementById('sitePagination').innerHTML='';
+    return;
+  }
+  // FIX 3: Show only key columns — Name, Format, City, Status, Actions
+  tbody.innerHTML = page.map(s=>`<tr>
+    <td style="font-family:monospace;color:var(--accent);font-weight:600">${s.site_id}</td>
+    <td style="font-weight:500">${s.site_name||'—'}</td>
+    <td>${s.site_format?`<span class="badge badge-purple">${s.site_format}</span>`:'—'}</td>
+    <td>${s.city||'—'}</td>
+    <td><span class="badge ${s.status==='Active'?'badge-green':'badge-gray'}">${s.status||'—'}</span></td>
+    <td>
+      <button class="btn btn-ghost btn-sm btn-icon" onclick="viewSite('${s.site_id}')" title="View Details">
+        <i class="fas fa-eye" style="color:var(--accent)"></i>
+      </button>
+    </td>
+  </tr>`).join('');
+  renderPagination();
+}
+
+function renderPagination(){
+  const pages = Math.ceil(filteredSites.length / PER_PAGE);
+  const total = filteredSites.length;
+  const el = document.getElementById('sitePagination');
+  if(pages<=1){
+    el.innerHTML=`<span style="font-size:.78rem;color:var(--muted)">${total} site${total!==1?'s':''}</span>`;
+    return;
+  }
+  // FIX 6: Premium pagination with ellipsis
+  const delta=2; let range=[],left=currentPage-delta,right=currentPage+delta+1,prev=null;
+  for(let i=1;i<=pages;i++){if(i===1||i===pages||(i>=left&&i<right))range.push(i);}
+  let btns='';
+  range.forEach(i=>{
+    if(prev&&i-prev>1) btns+=`<span class="page-btn disabled" style="border:none;background:none;color:var(--muted)">…</span>`;
+    btns+=`<button class="page-btn${i===currentPage?' active':''}" onclick="gotoPage(${i})">${i}</button>`;
+    prev=i;
+  });
+  const start=(currentPage-1)*PER_PAGE+1, end=Math.min(currentPage*PER_PAGE,total);
+  el.innerHTML=`
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:10px 0 2px">
+      <span style="font-size:.78rem;color:var(--muted)">Showing <strong style="color:var(--text)">${start}–${end}</strong> of <strong style="color:var(--text)">${total}</strong> sites</span>
+      <div style="display:flex;align-items:center;gap:4px">
+        <button class="page-btn${currentPage===1?' disabled':''}" onclick="gotoPage(${currentPage-1})" ${currentPage===1?'disabled':''} title="Prev"><i class="fas fa-chevron-left" style="font-size:.6rem"></i></button>
+        ${btns}
+        <button class="page-btn${currentPage===pages?' disabled':''}" onclick="gotoPage(${currentPage+1})" ${currentPage===pages?'disabled':''} title="Next"><i class="fas fa-chevron-right" style="font-size:.6rem"></i></button>
+      </div>
+    </div>`;
+}
+
+function gotoPage(p){ currentPage=p; renderTable(); }
+
+function viewSite(sid){
+  const s = allSites.find(x=>x.site_id===sid);
+  if(!s) return;
+  document.getElementById('viewSiteBody').innerHTML=`
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <!-- Hero gradient header -->
+      <div style="background:linear-gradient(135deg,var(--green-deep) 0%,#1a7a5e 100%);border-radius:14px;padding:18px 20px;display:flex;align-items:center;gap:14px">
+        <div style="width:50px;height:50px;border-radius:13px;background:rgba(255,255,255,.18);display:flex;align-items:center;justify-content:center;font-size:1.3rem;font-weight:800;color:#fff;flex-shrink:0;backdrop-filter:blur(4px)">
+          ${(s.site_name||'?')[0].toUpperCase()}
+        </div>
+        <div style="flex:1;min-width:0">
+          <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:1rem;font-weight:800;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${s.site_name||'—'}</div>
+          <div style="font-family:monospace;font-size:.78rem;color:rgba(255,255,255,.65);margin-top:2px">${s.site_id}</div>
+        </div>
+        ${s.site_format?`<span style="background:rgba(255,255,255,.18);color:#fff;border-radius:20px;padding:4px 12px;font-size:.72rem;font-weight:700;backdrop-filter:blur(4px)">${s.site_format}</span>`:''}
+        <span style="background:${s.status==='Active'?'rgba(74,222,128,.2)':'rgba(255,255,255,.1)'};color:${s.status==='Active'?'#4ade80':'rgba(255,255,255,.65)'};border-radius:20px;padding:4px 12px;font-size:.72rem;font-weight:700">${s.status||'—'}</span>
+      </div>
+      <!-- Detail grid using view-field classes -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="view-field">
+          <div class="view-label">City</div>
+          <div class="view-value">${s.city||'—'}</div>
+        </div>
+        <div class="view-field">
+          <div class="view-label">Region</div>
+          <div class="view-value">${s.region||'—'}</div>
+        </div>
+        <div class="view-field">
+          <div class="view-label">Store Size</div>
+          <div class="view-value">${s.store_size?Number(s.store_size).toLocaleString()+' sqft':'—'}</div>
+        </div>
+        <div class="view-field">
+          <div class="view-label">Open Date</div>
+          <div class="view-value">${s.open_date||'—'}</div>
+        </div>
+      </div>
+      <!-- Read-only notice -->
+      <div style="background:rgba(13,148,136,.06);border:1px solid rgba(13,148,136,.18);border-radius:10px;padding:10px 14px;font-size:.79rem;color:var(--accent2);display:flex;gap:8px;align-items:center">
+        <i class="fas fa-lock" style="flex-shrink:0"></i>
+        <span>Site details are read-only. Contact an administrator to request changes.</span>
+      </div>
+    </div>`;
+  openModal('viewSiteModal');
+}
+
+function sfield(label, val){
+  return `<div style="background:var(--surface2);border-radius:9px;padding:12px">
+    <div style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:4px">${label}</div>
+    <div style="font-weight:500;font-size:.88rem">${val}</div>
+  </div>`;
+}
+
+function openModal(id){ document.getElementById(id).classList.add('open'); }
+function closeModal(id){ document.getElementById(id).classList.remove('open'); }
+</script>
+{% endblock %}

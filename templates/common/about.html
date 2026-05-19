@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>About — INVEXA</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/landing.css') }}"/>
+  <style>
+    .stat-3d{transform-style:preserve-3d;transition:transform .3s,box-shadow .3s;}
+    .stat-3d:hover{transform:perspective(600px) rotateX(-5deg) rotateY(6deg) translateY(-4px);box-shadow:0 20px 40px rgba(0,0,0,.35);}
+    .mobile-nav-btn{display:none;background:none;border:none;color:var(--text);font-size:1.3rem;cursor:pointer;padding:6px;}
+    @media(max-width:768px){
+      .mobile-nav-btn{display:block;}
+      .nav-links{display:none;position:absolute;top:60px;left:0;right:0;background:var(--surface);border-bottom:1px solid var(--border);flex-direction:column;padding:12px 20px;gap:4px;z-index:100;}
+      .nav-links.open{display:flex;}
+      .about-grid{grid-template-columns:1fr!important;}
+      .mission-img{width:100%;border-radius:14px;object-fit:cover;max-height:260px;}
+    }
+  </style>
+<body>
+
+<nav class="public-nav">
+  <a href="{{ url_for('common.home') }}" class="nav-brand">
+    <div class="logo-box"><i class="fas fa-boxes-stacked" style="color:#1a3a2a;font-size:13px"></i></div>
+    <span class="brand-name">INVEXA</span>
+  </a>
+  <ul class="nav-links" id="navLinks">
+    <li><a href="{{ url_for('common.home') }}">Home</a></li>
+    <li><a href="{{ url_for('common.about') }}" class="active">About</a></li>
+    <li><a href="{{ url_for('common.features') }}">Features</a></li>
+    <li><a href="{{ url_for('common.contact') }}">Contact</a></li>
+  </ul>
+  <div class="nav-cta">
+    <button class="mobile-nav-btn" id="mobileNavBtn" aria-label="Toggle menu"><i class="fas fa-bars"></i></button>
+    {% if session.get('role') %}
+      <div class="nav-user-pill">
+        <div class="nav-user-avatar">{{ session.get('username','U')[0].upper() }}</div>
+        <span class="nav-user-name">{{ session.get('username','User') }}</span>
+      </div>
+      {% if session.get('role') == 'admin' %}
+        <a href="/admin/dashboard" class="nav-portal-badge"><span class="nav-portal-dot"></span>Admin Portal</a>
+      {% elif session.get('role') == 'analyst' %}
+        <a href="/analyst/dashboard" class="nav-portal-badge analyst"><span class="nav-portal-dot"></span>Analytics Portal</a>
+      {% else %}
+        <a href="/manager/dashboard" class="nav-portal-badge"><span class="nav-portal-dot"></span>Manager Portal</a>
+      {% endif %}
+      <a href="/logout" class="btn-nav-login" style="background:rgba(239,68,68,.12);color:#ef4444;border:1px solid rgba(239,68,68,.2)"><i class="fas fa-arrow-right-from-bracket"></i> Sign Out</a>
+    {% else %}
+      <a href="{{ url_for('auth.login') }}" class="btn-nav-login"><i class="fas fa-arrow-right-to-bracket"></i> Sign In</a>
+    {% endif %}
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero hero-sm">
+  <div class="hero-grid-bg"></div>
+  <div class="hero-glow"></div>
+  <div class="hero-inner">
+    <div class="hero-badge"><span class="badge-dot"></span>Our Story</div>
+    <h1 class="hero-title">Built for Businesses<br/><span class="highlight">That Move Fast</span></h1>
+    <p class="hero-desc">INVEXA was built to give every business — from small retailers to large distributors — enterprise-grade control over their supply chain.</p>
+  </div>
+</section>
+
+<!-- MISSION -->
+<section class="section">
+  <div class="section-inner">
+    <div class="about-grid">
+      <div>
+        <span class="section-eyebrow">Our Mission</span>
+        <h2 class="section-title">Inventory intelligence for everyone</h2>
+        <p class="section-desc" style="margin-bottom:16px">We believe every business deserves enterprise-grade inventory tools without the enterprise-grade price tag or complexity.</p>
+        <p class="section-desc">INVEXA was born from the frustration of managing stock across multiple locations with spreadsheets. We built the platform we wished existed.</p>
+        <div style="display:flex;flex-direction:column;gap:12px;margin-top:24px">
+          <div style="display:flex;align-items:center;gap:12px;font-size:.86rem;color:var(--muted)">
+            <div style="width:32px;height:32px;border-radius:8px;background:rgba(232,197,71,.1);display:flex;align-items:center;justify-content:center;color:var(--accent);flex-shrink:0"><i class="fas fa-check"></i></div>
+            Multi-site, multi-role inventory management
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;font-size:.86rem;color:var(--muted)">
+            <div style="width:32px;height:32px;border-radius:8px;background:rgba(232,197,71,.1);display:flex;align-items:center;justify-content:center;color:var(--accent);flex-shrink:0"><i class="fas fa-check"></i></div>
+            Real-time data with no refresh needed
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;font-size:.86rem;color:var(--muted)">
+            <div style="width:32px;height:32px;border-radius:8px;background:rgba(232,197,71,.1);display:flex;align-items:center;justify-content:center;color:var(--accent);flex-shrink:0"><i class="fas fa-check"></i></div>
+            Complete audit logging and traceability
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:center">
+        <img
+          src="https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=800&q=80&auto=format&fit=crop"
+          alt="Warehouse inventory management"
+          class="mission-img"
+          style="width:100%;max-width:500px;border-radius:18px;object-fit:cover;box-shadow:0 24px 64px rgba(0,0,0,.45);border:1px solid var(--border-md);transform:perspective(900px) rotateY(-6deg);transition:transform .4s ease;"
+          onmouseover="this.style.transform='perspective(900px) rotateY(0deg) scale(1.02)'"
+          onmouseout="this.style.transform='perspective(900px) rotateY(-6deg)'"
+        />
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CAROUSEL -->
+<section class="carousel-section">
+  <div class="carousel-header">
+    <span class="section-eyebrow">Platform Highlights</span>
+    <h2 class="section-title" style="font-size:1.8rem;margin-bottom:0">Everything in one place</h2>
+  </div>
+  <div class="carousel-track-wrap">
+    <button class="carousel-btn prev" onclick="carouselMove(-1)"><i class="fas fa-chevron-left"></i></button>
+    <div class="carousel-track" id="carouselTrack">
+      <div class="carousel-slide"><img src="https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=1200&q=85&auto=format&fit=crop" class="carousel-slide-img" alt="Warehouse"/></div>
+      <div class="carousel-slide"><img src="https://images.unsplash.com/photo-1566576912321-d58ddd7a6088?w=1200&q=85&auto=format&fit=crop" class="carousel-slide-img" alt="Purchase orders"/></div>
+      <div class="carousel-slide"><img src="https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=1200&q=85&auto=format&fit=crop" class="carousel-slide-img" alt="Analytics"/></div>
+      <div class="carousel-slide"><img src="https://images.unsplash.com/photo-1601628828688-632f38a5a7d0?w=1200&q=85&auto=format&fit=crop" class="carousel-slide-img" alt="Logistics"/></div>
+      <div class="carousel-slide"><img src="https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=1200&q=85&auto=format&fit=crop" class="carousel-slide-img" alt="Audit"/></div>
+    </div>
+    <button class="carousel-btn next" onclick="carouselMove(1)"><i class="fas fa-chevron-right"></i></button>
+  </div>
+  <div class="carousel-nav" id="carouselDots"></div>
+</section>
+
+<!-- VALUES -->
+<section class="section-alt">
+  <div class="section-inner">
+    <div class="section-header center">
+      <span class="section-eyebrow">What We Stand For</span>
+      <h2 class="section-title">Our core values</h2>
+    </div>
+    <div class="values-bento">
+      <!-- Card 1 — Transparency -->
+      <div class="value-bento-card" style="--vbc-color:#0d7a6b;--vbc-bg:rgba(13,122,107,.09)">
+        <div class="vbc-icon"><i class="fas fa-eye"></i></div>
+        <div style="flex:1;min-width:0">
+          <div class="vbc-title">Transparency</div>
+          <div class="vbc-desc">Full audit trails, open data, no black boxes. You should always know exactly what's happening inside your system.</div>
+        </div>
+        <div class="vbc-num">01</div>
+      </div>
+      <!-- Card 2 — Speed -->
+      <div class="value-bento-card" style="--vbc-color:#f97316;--vbc-bg:rgba(249,115,22,.09)">
+        <div class="vbc-icon" style="background:rgba(249,115,22,.09);color:#f97316"><i class="fas fa-bolt"></i></div>
+        <div style="flex:1;min-width:0">
+          <div class="vbc-title">Speed</div>
+          <div class="vbc-desc">Real-time data with zero delays. Decisions that used to take days now take seconds with live dashboards.</div>
+        </div>
+        <div class="vbc-num">02</div>
+      </div>
+      <!-- Card 3 — Reliability -->
+      <div class="value-bento-card" style="--vbc-color:#16a34a;--vbc-bg:rgba(22,163,74,.09)">
+        <div class="vbc-icon" style="background:rgba(22,163,74,.09);color:#16a34a"><i class="fas fa-shield-halved"></i></div>
+        <div style="flex:1;min-width:0">
+          <div class="vbc-title">Reliability</div>
+          <div class="vbc-desc">Built on a robust PostgreSQL backend with role-based access control and enterprise-grade security baked in.</div>
+        </div>
+        <div class="vbc-num">03</div>
+      </div>
+      <!-- Card 4 — Collaboration -->
+      <div class="value-bento-card" style="--vbc-color:#3b82f6;--vbc-bg:rgba(59,130,246,.09)">
+        <div class="vbc-icon" style="background:rgba(59,130,246,.09);color:#3b82f6"><i class="fas fa-users"></i></div>
+        <div style="flex:1;min-width:0">
+          <div class="vbc-title">Collaboration</div>
+          <div class="vbc-desc">Multi-role dashboards so admins, managers and analysts always have the right context at the right time.</div>
+        </div>
+        <div class="vbc-num">04</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<footer class="site-footer">
+  <div class="footer-grid">
+    <div>
+      <div class="footer-brand-name"><i class="fas fa-boxes-stacked" style="color:var(--accent)"></i>INVEXA</div>
+      <p class="footer-desc">INVEXA — complete control over your stock, orders, and supply chain.</p>
+    </div>
+    <div class="footer-col">
+      <div class="footer-col-title">Product</div>
+      <a href="{{ url_for('common.features') }}">Features</a>
+      <a href="#">Pricing</a>
+    </div>
+    <div class="footer-col">
+      <div class="footer-col-title">Company</div>
+      <a href="{{ url_for('common.about') }}">About Us</a>
+      <a href="{{ url_for('common.contact') }}">Contact</a>
+    </div>
+    <div class="footer-col">
+      <div class="footer-col-title">Support</div>
+      <a href="#">Help Centre</a>
+      <a href="#">Privacy Policy</a>
+    </div>
+  </div>
+  <div class="footer-bottom"><span>© 2025 INVEXA. All rights reserved.</span></div>
+</footer>
+
+<script>
+// Mobile nav
+(function(){
+  const btn=document.getElementById('mobileNavBtn');
+  const links=document.querySelector('.nav-links');
+  if(btn&&links) btn.addEventListener('click',()=>links.classList.toggle('open'));
+})();
+
+// Count-up animation
+(function(){
+  const counters=document.querySelectorAll('.count-up');
+  if(!counters.length) return;
+  const observer=new IntersectionObserver(entries=>{
+    entries.forEach(entry=>{
+      if(!entry.isIntersecting) return;
+      const el=entry.target;
+      const target=parseInt(el.dataset.val)||0;
+      if(!target){el.textContent='0';return;}
+      let start=0;
+      const step=ts=>{if(!start)start=ts;const p=Math.min((ts-start)/1200,1);const e=1-Math.pow(1-p,3);el.textContent=Math.floor(e*target).toLocaleString();if(p<1)requestAnimationFrame(step);else el.textContent=target.toLocaleString();};
+      requestAnimationFrame(step);
+      observer.unobserve(el);
+    });
+  },{threshold:0.2});
+  counters.forEach(c=>observer.observe(c));
+})();
+
+// Team members
+(async()=>{
+  try{
+    const res=await fetch('/api/team-members');
+    if(!res.ok) return;
+    const d=await res.json();
+    const grid=document.getElementById('teamGrid');
+    if(!d.members||!d.members.length) return;
+    const GRAD={
+      admin:  'linear-gradient(135deg,#e8c547,#d4a517)',
+      manager:'linear-gradient(135deg,#f97316,#e06510)',
+      staff:  'linear-gradient(135deg,#3b82f6,#2c6fd4)',
+      analyst:'linear-gradient(135deg,#a78bfa,#9470e6)',
+    };
+    const DEF='linear-gradient(135deg,#8b8fa8,#72768f)';
+    grid.innerHTML=d.members.map((m)=>{
+      const grad=GRAD[m.role_key]||DEF;
+      const badgeCls=m.role_key==='admin'?'admin':m.role_key==='manager'?'manager':'staff';
+      return `<div class="team-card">
+        <div class="team-avatar" style="background:${grad}">${m.initials}</div>
+        <div class="team-name">${m.name}</div>
+        <div class="team-role">${m.role}</div>
+        <span class="team-badge ${badgeCls}">${m.role_key}</span>
+      </div>`;
+    }).join('');
+    const desc=document.getElementById('teamCountDesc');
+    if(desc) desc.textContent=`${d.total||d.members.length} member${(d.total||d.members.length)!==1?'s':''} powering the INVEXA platform.`;
+  }catch(e){}
+})();
+
+// Realtime stats polling every 60s
+async function refreshAboutStats(){
+  try{
+    const r=await fetch('/api/platform-stats');
+    if(!r.ok) return;
+    const d=await r.json();
+    // Update any .count-up elements that match known IDs
+    const map={'aProducts':d.products,'aSites':d.sites,'aUsers':d.users,'aInventory':d.inventory};
+    Object.entries(map).forEach(([id,val])=>{
+      const el=document.getElementById(id);
+      if(el){el.textContent=(val||0).toLocaleString();el.dataset.val=val||0;}
+    });
+  }catch(e){}
+}
+setInterval(refreshAboutStats,60000);
+// Carousel
+let carouselIdx=0;
+const slides=document.querySelectorAll('.carousel-slide');
+const dotsContainer=document.getElementById('carouselDots');
+slides.forEach((_,i)=>{
+  const dot=document.createElement('button');
+  dot.className='carousel-dot'+(i===0?' active':'');
+  dot.onclick=()=>goSlide(i);
+  dotsContainer.appendChild(dot);
+});
+function goSlide(idx){
+  carouselIdx=(idx+slides.length)%slides.length;
+  document.getElementById('carouselTrack').style.transform=`translateX(-${carouselIdx*100}%)`;
+  document.querySelectorAll('.carousel-dot').forEach((d,i)=>d.classList.toggle('active',i===carouselIdx));
+}
+function carouselMove(dir){goSlide(carouselIdx+dir);}
+setInterval(()=>carouselMove(1),5000);
+
+</script>
+</body>
+</html>

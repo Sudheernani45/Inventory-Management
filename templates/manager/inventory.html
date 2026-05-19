@@ -1,0 +1,261 @@
+{% extends "manager/base.html" %}
+{% block title %}Inventory{% endblock %}
+{% block page_title %}<i class="fas fa-warehouse" style="color:var(--accent);margin-right:8px"></i>Inventory{% endblock %}
+
+{% block content %}
+
+<!-- Stats Bar -->
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px">
+  <div class="card" style="padding:18px 20px;margin:0">
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <div>
+        <div style="font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600">Total Records</div>
+        <div style="font-size:1.6rem;font-weight:800;font-family:'Plus Jakarta Sans',sans-serif;color:var(--text);margin-top:4px" id="statTotal">—</div>
+      </div>
+      <div style="width:42px;height:42px;border-radius:12px;background:var(--accent-dim);display:flex;align-items:center;justify-content:center;color:var(--accent)"><i class="fas fa-warehouse"></i></div>
+    </div>
+  </div>
+  <div class="card" style="padding:18px 20px;margin:0">
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <div>
+        <div style="font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600">In Stock</div>
+        <div style="font-size:1.6rem;font-weight:800;font-family:'Plus Jakarta Sans',sans-serif;color:var(--success);margin-top:4px" id="statInStock">—</div>
+      </div>
+      <div style="width:42px;height:42px;border-radius:12px;background:var(--success-dim);display:flex;align-items:center;justify-content:center;color:var(--success)"><i class="fas fa-circle-check"></i></div>
+    </div>
+  </div>
+  <div class="card" style="padding:18px 20px;margin:0">
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <div>
+        <div style="font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600">Stockouts</div>
+        <div style="font-size:1.6rem;font-weight:800;font-family:'Plus Jakarta Sans',sans-serif;color:var(--danger);margin-top:4px" id="statStockout">—</div>
+      </div>
+      <div style="width:42px;height:42px;border-radius:12px;background:rgba(239,68,68,.1);display:flex;align-items:center;justify-content:center;color:var(--danger)"><i class="fas fa-triangle-exclamation"></i></div>
+    </div>
+  </div>
+  <div class="card" style="padding:18px 20px;margin:0">
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <div>
+        <div style="font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600">Replenished</div>
+        <div style="font-size:1.6rem;font-weight:800;font-family:'Plus Jakarta Sans',sans-serif;color:#3b82f6;margin-top:4px" id="statReplened">—</div>
+      </div>
+      <div style="width:42px;height:42px;border-radius:12px;background:rgba(59,130,246,.1);display:flex;align-items:center;justify-content:center;color:#3b82f6"><i class="fas fa-boxes-stacked"></i></div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header" style="flex-wrap:wrap;gap:10px">
+    <div style="display:flex;align-items:center;gap:12px">
+      <div class="card-title"><i class="fas fa-warehouse" style="color:var(--accent)"></i>Site Inventory</div>
+      <span id="invCount" class="badge badge-blue">—</span>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+      <div class="search-box">
+        <i class="fas fa-search"></i>
+        <input type="text" id="invSearch" class="form-control" placeholder="Search product…" style="width:200px" oninput="debounceLoad()"/>
+      </div>
+      <select class="form-control" id="stockoutFilter" onchange="loadInventory(1)" style="width:150px">
+        <option value="">All Stock</option>
+        <option value="yes">Stockout Only</option>
+      </select>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>#</th><th>Product</th><th>Site</th><th>Starting Inv.</th><th>Replenishment</th><th>Ending Inv.</th><th>Current Stock</th><th>Status</th><th style="text-align:right">Actions</th></tr>
+      </thead>
+      <tbody id="invTbody">
+        <tr class="skeleton-row"><td><div class="skeleton" style="height:13px;width:30px"></div></td><td><div class="skeleton" style="height:13px"></div></td><td><div class="skeleton" style="height:13px;width:80%"></div></td><td><div class="skeleton" style="height:13px;width:60%"></div></td><td><div class="skeleton" style="height:13px;width:60%"></div></td><td><div class="skeleton" style="height:13px;width:60%"></div></td><td><div class="skeleton" style="height:13px;width:50%"></div></td><td><div class="skeleton" style="height:22px;width:60px;border-radius:20px"></div></td><td><div class="skeleton" style="height:28px;width:36px;border-radius:8px"></div></td></tr>
+        <tr class="skeleton-row"><td><div class="skeleton" style="height:13px;width:30px"></div></td><td><div class="skeleton" style="height:13px"></div></td><td><div class="skeleton" style="height:13px;width:80%"></div></td><td><div class="skeleton" style="height:13px;width:60%"></div></td><td><div class="skeleton" style="height:13px;width:60%"></div></td><td><div class="skeleton" style="height:13px;width:60%"></div></td><td><div class="skeleton" style="height:13px;width:50%"></div></td><td><div class="skeleton" style="height:22px;width:60px;border-radius:20px"></div></td><td><div class="skeleton" style="height:28px;width:36px;border-radius:8px"></div></td></tr>
+        <tr class="skeleton-row"><td><div class="skeleton" style="height:13px;width:30px"></div></td><td><div class="skeleton" style="height:13px"></div></td><td><div class="skeleton" style="height:13px;width:80%"></div></td><td><div class="skeleton" style="height:13px;width:60%"></div></td><td><div class="skeleton" style="height:13px;width:60%"></div></td><td><div class="skeleton" style="height:13px;width:60%"></div></td><td><div class="skeleton" style="height:13px;width:50%"></div></td><td><div class="skeleton" style="height:22px;width:60px;border-radius:20px"></div></td><td><div class="skeleton" style="height:28px;width:36px;border-radius:8px"></div></td></tr>
+        <tr class="skeleton-row"><td><div class="skeleton" style="height:13px;width:30px"></div></td><td><div class="skeleton" style="height:13px"></div></td><td><div class="skeleton" style="height:13px;width:80%"></div></td><td><div class="skeleton" style="height:13px;width:60%"></div></td><td><div class="skeleton" style="height:13px;width:60%"></div></td><td><div class="skeleton" style="height:13px;width:60%"></div></td><td><div class="skeleton" style="height:13px;width:50%"></div></td><td><div class="skeleton" style="height:22px;width:60px;border-radius:20px"></div></td><td><div class="skeleton" style="height:28px;width:36px;border-radius:8px"></div></td></tr>
+        <tr class="skeleton-row"><td><div class="skeleton" style="height:13px;width:30px"></div></td><td><div class="skeleton" style="height:13px"></div></td><td><div class="skeleton" style="height:13px;width:80%"></div></td><td><div class="skeleton" style="height:13px;width:60%"></div></td><td><div class="skeleton" style="height:13px;width:60%"></div></td><td><div class="skeleton" style="height:13px;width:60%"></div></td><td><div class="skeleton" style="height:13px;width:50%"></div></td><td><div class="skeleton" style="height:22px;width:60px;border-radius:20px"></div></td><td><div class="skeleton" style="height:28px;width:36px;border-radius:8px"></div></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div id="invPagination" style="display:flex;align-items:center;justify-content:space-between;padding:14px 0 0;font-size:.82rem;color:var(--muted)"></div>
+</div>
+
+<!-- VIEW MODAL -->
+<div class="modal-overlay" id="invViewModal">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-header">
+      <div class="modal-title"><i class="fas fa-warehouse" style="color:var(--accent)"></i>Inventory Details</div>
+      <span class="modal-close" onclick="closeModal('invViewModal')"><i class="fas fa-times"></i></span>
+    </div>
+    <div class="modal-body" id="invViewBody"></div>
+    <div class="modal-footer"><button class="btn btn-ghost" onclick="closeModal('invViewModal')">Close</button></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let invPage = 1, invRecords = [], invSearchTimer = null;
+function debounceLoad(){ clearTimeout(invSearchTimer); invSearchTimer = setTimeout(()=>loadInventory(1), 350); }
+
+(function(){ loadInventory(1); })();
+
+async function loadInventory(page = 1) {
+  invPage = page;
+  const stockout = document.getElementById('stockoutFilter').value;
+  const q = document.getElementById('invSearch')?.value?.trim() || '';
+  let url = `/manager/api/inventory?page=${page}`;
+  if (stockout) url += `&stockout=${stockout}`;
+  if (q) url += `&q=${encodeURIComponent(q)}`;
+  try {
+    const { ok, data } = await apiFetch(url);
+    if (!ok) return;
+    invRecords = data.records || [];
+    const total = data.total || 0;
+    document.getElementById('invCount').textContent = total;
+
+    // Update stats from API response
+    if (page === 1 && data.stats) {
+      document.getElementById('statTotal').textContent    = data.stats.total_records;
+      document.getElementById('statInStock').textContent  = data.stats.in_stock;
+      document.getElementById('statStockout').textContent = data.stats.stockouts;
+      document.getElementById('statReplened').textContent = data.stats.replenished;
+    }
+
+    const tbody = document.getElementById('invTbody');
+    if (!invRecords.length) {
+      tbody.innerHTML = '<tr><td colspan="9"><div class="empty-state"><i class="fas fa-warehouse"></i><p>No inventory records found</p></div></td></tr>';
+      document.getElementById('invPagination').innerHTML = '';
+      return;
+    }
+    tbody.innerHTML = invRecords.map((r, i) => {
+      const bi   = Number(r.beginning_inventory || 0);
+      const rep  = Number(r.replenishment || 0);
+      const ei   = Number(r.ending_inventory || 0);
+      const cs   = Number(r.current_stock || ei);
+      const rp   = Number(r.reorder_point || 0);
+      const csColor = cs <= 0 ? 'var(--danger)' : cs <= rp ? 'var(--warn)' : 'var(--accent)';
+      const eiColor = ei <= 0 ? 'var(--danger)' : 'var(--text)';
+      const statusBadge = cs <= 0 || r.stockout_flag==='Yes' ? 'badge-red' : cs <= rp && rp > 0 ? 'badge-warn' : 'badge-green';
+      const statusLabel = cs <= 0 || r.stockout_flag==='Yes' ? 'Stockout' : cs <= rp && rp > 0 ? 'Low Stock' : 'In Stock';
+      return `<tr>
+        <td style="color:var(--muted)">${(page-1)*20+i+1}</td>
+        <td style="font-weight:500">${r.product_name||'—'}</td>
+        <td><span class="badge badge-blue" style="font-size:.7rem">${r.site_name||'—'}</span></td>
+        <td style="text-align:center;color:var(--muted)">${bi.toLocaleString()}</td>
+        <td style="text-align:center;color:#3b82f6;font-weight:600">${rep.toLocaleString()}</td>
+        <td style="text-align:center;font-weight:700;color:${eiColor}">${ei.toLocaleString()}</td>
+        <td style="text-align:center;font-weight:700;color:${csColor}">${cs.toLocaleString()}</td>
+        <td><span class="badge ${statusBadge}" style="font-size:.7rem">${statusLabel}</span></td>
+        <td style="text-align:right">
+          <button class="btn btn-ghost btn-sm btn-icon" onclick="openInvView(${i})" title="View">
+            <i class="fas fa-eye" style="color:var(--accent)"></i>
+          </button>
+        </td>
+      </tr>`;
+    }).join('');
+    renderPag('invPagination', page, total, 20, 'loadInventory');
+  } catch(e) { showToast && showToast('Error loading inventory', 'error'); }
+}
+
+function openInvView(idx) {
+  const r = invRecords[idx]; if (!r) return;
+  const bi  = Number(r.beginning_inventory || 0);
+  const rep = Number(r.replenishment || 0);
+  const ei  = Number(r.ending_inventory || 0);
+  const displayBI = (bi === 0 && rep > 0) ? ei + rep : bi;
+  const diff = ei - displayBI;
+  const stockOk = r.stockout_flag !== 'Yes';
+  document.getElementById('invViewBody').innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div style="background:linear-gradient(135deg,${stockOk?'#14532d,#166534':'#7f1d1d,#991b1b'});border-radius:14px;padding:18px 20px;display:flex;align-items:center;gap:14px">
+        <div style="width:48px;height:48px;border-radius:13px;background:rgba(255,255,255,.18);display:flex;align-items:center;justify-content:center;font-size:1.3rem;color:#fff;flex-shrink:0">
+          <i class="fas fa-boxes-stacked"></i>
+        </div>
+        <div style="flex:1;min-width:0">
+          <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:.98rem;font-weight:800;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.product_name||'—'}</div>
+          <div style="color:rgba(255,255,255,.65);font-size:.76rem;margin-top:2px">${r.site_name||'—'}</div>
+        </div>
+        <div style="text-align:right;flex-shrink:0">
+          <div style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;color:#fff;font-size:1.3rem">${ei.toLocaleString()}</div>
+          <div style="color:rgba(255,255,255,.6);font-size:.68rem">Ending Inventory</div>
+        </div>
+      </div>
+      <div style="background:var(--surface2);border-radius:10px;padding:14px;border:1px solid var(--border)">
+        <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;color:var(--muted2);letter-spacing:.06em;margin-bottom:10px">Inventory Formula  EI = BI + R − S</div>
+        <div style="font-family:'Courier New',monospace;font-size:.85rem;line-height:1.6;color:var(--accent);font-weight:600">
+          ${ei.toLocaleString()} = ${displayBI.toLocaleString()} + ${rep.toLocaleString()} − ${Number(r.total_sold||0).toLocaleString()}
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="view-field"><div class="view-label">Beginning Inventory</div><div class="view-value" style="color:var(--blue)">${displayBI.toLocaleString()}</div></div>
+        <div class="view-field"><div class="view-label">Ending Inventory</div><div class="view-value" style="color:${stockOk?'var(--accent3)':'var(--danger)'}">${ei.toLocaleString()}</div></div>
+        <div class="view-field"><div class="view-label">Replenishment (R)</div><div class="view-value" style="color:var(--blue)">${rep.toLocaleString()}</div></div>
+        <div class="view-field"><div class="view-label">Sold (S)</div><div class="view-value" style="color:var(--orange)">${Number(r.total_sold||0).toLocaleString()}</div></div>
+        <div class="view-field"><div class="view-label">Net Change</div><div class="view-value" style="color:${diff>=0?'var(--accent3)':'var(--danger)'}">${diff>=0?'+':''}${diff.toLocaleString()}</div></div>
+        <div class="view-field"><div class="view-label">Stock Status</div><div style="margin-top:6px"><span class="badge ${stockOk?'badge-green':'badge-red'}">${stockOk?'In Stock':'Stockout'}</span></div></div>
+      </div>
+      <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;color:var(--muted2);letter-spacing:.06em">Order Integration</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div style="background:rgba(14,107,63,.07);border:1px solid rgba(14,107,63,.25);border-radius:10px;padding:12px">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+            <i class="fas fa-file-invoice" style="color:var(--accent);font-size:.8rem"></i>
+            <span style="font-size:.68rem;font-weight:700;text-transform:uppercase;color:var(--accent)">Sales Orders</span>
+          </div>
+          <div style="font-size:1.2rem;font-weight:800;color:var(--text)">${Number(r.so_count||0).toLocaleString()}</div>
+          <div style="font-size:.65rem;color:var(--muted)">orders placed</div>
+          <div style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(14,107,63,.15)">
+            <div style="font-size:.75rem;font-weight:700;color:var(--accent)">₹${Number(r.so_total||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
+            <div style="font-size:.62rem;color:var(--muted)">total SO value</div>
+          </div>
+        </div>
+        <div style="background:rgba(59,130,246,.07);border:1px solid rgba(59,130,246,.25);border-radius:10px;padding:12px">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+            <i class="fas fa-cart-shopping" style="color:#3b82f6;font-size:.8rem"></i>
+            <span style="font-size:.68rem;font-weight:700;text-transform:uppercase;color:#3b82f6">Purchase Orders</span>
+          </div>
+          <div style="font-size:1.2rem;font-weight:800;color:var(--text)">${Number(r.po_count||0).toLocaleString()}</div>
+          <div style="font-size:.65rem;color:var(--muted)">orders received</div>
+          <div style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(59,130,246,.15)">
+            <div style="font-size:.75rem;font-weight:700;color:#3b82f6">₹${Number(r.po_total||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
+            <div style="font-size:.62rem;color:var(--muted)">total PO cost</div>
+          </div>
+        </div>
+      </div>
+      <div style="background:var(--surface2);border-radius:9px;padding:10px 14px;border:1px solid var(--border)">
+        <div style="font-size:.68rem;font-weight:700;text-transform:uppercase;color:var(--muted2);letter-spacing:.06em;margin-bottom:6px">Pricing</div>
+        <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px">
+          <div><div style="font-size:.7rem;color:var(--muted)">Unit Cost</div><div style="font-weight:700;color:var(--danger)">₹${Number(r.unit_cost||0).toFixed(2)}</div></div>
+          <div><div style="font-size:.7rem;color:var(--muted)">Unit Price</div><div style="font-weight:700;color:var(--accent)">₹${Number(r.unit_price||0).toFixed(2)}</div></div>
+          <div><div style="font-size:.7rem;color:var(--muted)">Qty Sold</div><div style="font-weight:700;color:var(--orange)">${Number(r.total_sold||0).toLocaleString()} units</div></div>
+        </div>
+      </div>
+    </div>`;
+  openModal('invViewModal');
+}
+
+function renderPag(elId, page, total, pp, fn) {
+  const pages = Math.ceil(total/pp);
+  const el = document.getElementById(elId); if (!el) return;
+  if (pages <= 1) { el.innerHTML = `<span style="font-size:.78rem;color:var(--muted)">${total} record${total!==1?'s':''}</span>`; return; }
+  const delta=2; let range=[],left=page-delta,right=page+delta+1,prev=null;
+  for(let i=1;i<=pages;i++){if(i===1||i===pages||(i>=left&&i<right))range.push(i);}
+  let btns='';
+  range.forEach(i=>{
+    if(prev&&i-prev>1)btns+=`<span class="page-btn disabled" style="border:none;background:none;color:var(--muted)">…</span>`;
+    btns+=`<a class="page-btn${i===page?' active':''}" onclick="${fn}(${i})">${i}</a>`;
+    prev=i;
+  });
+  const start=(page-1)*pp+1, end=Math.min(page*pp,total);
+  el.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:10px 0 2px">
+    <span style="font-size:.78rem;color:var(--muted)">Showing <strong style="color:var(--text)">${start}–${end}</strong> of <strong style="color:var(--text)">${total}</strong></span>
+    <div style="display:flex;align-items:center;gap:4px">
+      <button class="page-btn${page===1?' disabled':''}" onclick="${fn}(${page-1})" ${page===1?'disabled':''} title="Prev"><i class="fas fa-chevron-left" style="font-size:.6rem"></i></button>
+      ${btns}
+      <button class="page-btn${page===pages?' disabled':''}" onclick="${fn}(${page+1})" ${page===pages?'disabled':''} title="Next"><i class="fas fa-chevron-right" style="font-size:.6rem"></i></button>
+    </div>
+  </div>`;
+}
+
+function openModal(id)  { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+</script>
+{% endblock %}

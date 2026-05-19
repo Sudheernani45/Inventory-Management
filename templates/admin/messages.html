@@ -1,0 +1,150 @@
+{% extends "admin/base.html" %}
+{% block title %}Messages{% endblock %}
+{% block page_title %}<i class="fas fa-envelope" style="color:var(--accent);margin-right:8px"></i>Contact Messages{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header" style="flex-wrap:wrap;gap:10px">
+    <div style="display:flex;align-items:center;gap:12px">
+      <div class="card-title">Inbox</div>
+      <span id="msgCount" class="badge badge-blue">—</span>
+      <span id="unreadBadge" class="badge badge-red" style="display:none">— unread</span>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center">
+      <div style="position:relative">
+        <i class="fas fa-search" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:.8rem"></i>
+        <input type="text" id="msgSearch" class="form-control" placeholder="Search messages…" style="padding-left:32px;width:200px" oninput="debounce()"/>
+      </div>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>#</th><th>Name</th><th>Email</th><th>Subject</th><th>Message</th><th>Date</th><th>Status</th><th>Actions</th></tr></thead>
+      <tbody id="msgTbody"><tr><td colspan="8" style="text-align:center;padding:32px"><span class="spinner"></span></td></tr></tbody>
+    </table>
+  </div>
+  <div id="msgPag" style="display:flex;align-items:center;justify-content:space-between;padding:14px 0 0;font-size:.82rem;color:var(--muted)"></div>
+</div>
+
+<!-- VIEW MESSAGE MODAL -->
+<div class="modal-overlay" id="viewMsgModal">
+  <div class="modal" style="max-width:540px">
+    <div class="modal-header">
+      <div class="modal-title"><i class="fas fa-envelope-open" style="color:var(--accent)"></i>Message Details</div>
+      <span class="modal-close" onclick="closeModal('viewMsgModal')"><i class="fas fa-times"></i></span>
+    </div>
+    <div class="modal-body" id="viewMsgBody"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('viewMsgModal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- DELETE CONFIRM -->
+<div class="modal-overlay" id="delMsgModal">
+  <div class="modal" style="max-width:400px">
+    <div class="modal-header">
+      <div class="modal-title" style="color:var(--danger)"><i class="fas fa-trash"></i>Delete Message</div>
+      <span class="modal-close" onclick="closeModal('delMsgModal')"><i class="fas fa-times"></i></span>
+    </div>
+    <div class="modal-body"><p style="color:var(--muted)">Permanently delete this message?</p></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('delMsgModal')">Cancel</button>
+      <button class="btn btn-danger" onclick="confirmDelMsg()"><i class="fas fa-trash"></i> Delete</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let msgPage=1,msgTimer=null,delMsgId=null,allMsgs=[];
+function debounce(){clearTimeout(msgTimer);msgTimer=setTimeout(()=>loadMsgs(1),300);}
+
+loadMsgs(1);
+
+async function loadMsgs(page=1){
+  msgPage=page;
+  const q=document.getElementById('msgSearch').value.trim();
+  const {ok,data}=await apiFetch(`/admin/api/messages?page=${page}&q=${encodeURIComponent(q)}`);
+  if(!ok)return;
+  allMsgs=data.messages||[];
+  document.getElementById('msgCount').textContent=data.total||0;
+  const unread=data.unread||0;
+  const ub=document.getElementById('unreadBadge');
+  if(unread>0){ub.textContent=`${unread} unread`;ub.style.display='';}else{ub.style.display='none';}
+  const tbody=document.getElementById('msgTbody');
+  if(!allMsgs.length){tbody.innerHTML='<tr><td colspan="8"><div class="empty-state"><i class="fas fa-envelope"></i><p>No messages yet</p></div></td></tr>';document.getElementById('msgPag').innerHTML='';return;}
+  tbody.innerHTML=allMsgs.map((m,i)=>`<tr style="${!m.is_read?'background:rgba(79,70,229,.04)':''}">
+    <td style="color:var(--muted)">${(page-1)*20+i+1}</td>
+    <td style="font-weight:${m.is_read?'400':'700'}">${m.name||'—'}</td>
+    <td style="color:var(--muted);font-size:.83rem">${m.email||'—'}</td>
+    <td style="font-size:.83rem">${m.subject||'General'}</td>
+    <td style="color:var(--muted);font-size:.82rem;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${(m.message||'').substring(0,60)}${m.message&&m.message.length>60?'…':''}</td>
+    <td style="color:var(--muted);font-size:.82rem">${m.created_at||'—'}</td>
+    <td>${m.is_read?'<span class="badge badge-green">Read</span>':'<span class="badge badge-yellow">Unread</span>'}</td>
+    <td>
+      <div style="display:flex;gap:5px">
+        <button class="btn btn-ghost btn-sm btn-icon" onclick="viewMsg(${i})" title="View"><i class="fas fa-eye" style="color:var(--accent)"></i></button>
+        <button class="btn btn-ghost btn-sm btn-icon" onclick="openDelMsg(${m.id})"><i class="fas fa-trash" style="color:var(--danger)"></i></button>
+      </div>
+    </td>
+  </tr>`).join('');
+  renderPag('msgPag',page,data.total,20,'loadMsgs');
+}
+
+function openModal(id){document.getElementById(id).classList.add('open');}
+function closeModal(id){document.getElementById(id).classList.remove('open');}
+
+async function viewMsg(idx){
+  const m=allMsgs[idx];if(!m)return;
+  document.getElementById('viewMsgBody').innerHTML=`
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="view-field"><div class="view-label">From</div><div class="view-value">${m.name||'—'}</div></div>
+        <div class="view-field"><div class="view-label">Email</div><div class="view-value" style="font-size:.85rem">${m.email||'—'}</div></div>
+        <div class="view-field"><div class="view-label">Company</div><div class="view-value">${m.company||'—'}</div></div>
+        <div class="view-field"><div class="view-label">Date</div><div class="view-value">${m.created_at||'—'}</div></div>
+        <div class="view-field" style="grid-column:1/-1"><div class="view-label">Subject</div><div class="view-value">${m.subject||'General Inquiry'}</div></div>
+      </div>
+      <div class="view-field">
+        <div class="view-label">Message</div>
+        <div style="margin-top:8px;background:var(--surface2);border-radius:10px;padding:14px;color:var(--text);font-size:.88rem;line-height:1.6;white-space:pre-wrap">${m.message||'—'}</div>
+      </div>
+    </div>`;
+  openModal('viewMsgModal');
+  if(!m.is_read){
+    await apiFetch(`/admin/api/messages/${m.id}/read`,{method:'POST'});
+    m.is_read=true;
+    await loadMsgs(msgPage);
+  }
+}
+
+function openDelMsg(id){delMsgId=id;openModal('delMsgModal');}
+async function confirmDelMsg(){
+  if(!delMsgId)return;
+  const {ok,data}=await apiFetch(`/admin/api/messages/${delMsgId}/delete`,{method:'POST'});
+  if(ok&&data.status==='success'){closeModal('delMsgModal');await loadMsgs(msgPage);showToast('Message deleted','success');}
+  else showToast('Failed to delete','error');
+  delMsgId=null;
+}
+
+function renderPag(elId,page,total,pp,fn){
+  const pages=Math.ceil(total/pp);const el=document.getElementById(elId);
+  if(!el)return;
+  if(pages<=1){el.innerHTML=`<span style="font-size:.78rem;color:var(--muted)">${total} message${total!==1?'s':''}</span>`;return;}
+  let btns='',prev=null;
+  const delta=2,left=page-delta,right=page+delta+1;
+  for(let i=1;i<=pages;i++){if(i===1||i===pages||(i>=left&&i<right)){if(prev&&i-prev>1)btns+=`<span class="page-btn disabled">…</span>`;btns+=`<a class="page-btn${i===page?' active':''}" onclick="${fn}(${i})">${i}</a>`;prev=i;}}
+  const start=(page-1)*pp+1,end=Math.min(page*pp,total);
+  el.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:10px 0 2px">
+    <span style="font-size:.78rem;color:var(--muted)">Showing <strong>${start}–${end}</strong> of <strong>${total}</strong></span>
+    <div style="display:flex;gap:4px">
+      <button class="page-btn${page===1?' disabled':''}" onclick="${fn}(${page-1})" ${page===1?'disabled':''}><i class="fas fa-chevron-left" style="font-size:.6rem"></i></button>
+      ${btns}
+      <button class="page-btn${page===pages?' disabled':''}" onclick="${fn}(${page+1})" ${page===pages?'disabled':''}><i class="fas fa-chevron-right" style="font-size:.6rem"></i></button>
+    </div>
+  </div>`;
+}
+</script>
+{% endblock %}

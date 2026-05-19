@@ -1,0 +1,348 @@
+{% extends "admin/base.html" %}
+{% block title %}Dashboard — INVEXA{% endblock %}
+{% block page_title %}<i class="fas fa-gauge-high" style="color:var(--accent);margin-right:8px"></i>Dashboard{% endblock %}
+
+{% block head %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px;}
+@media(max-width:1100px){.kpi-grid{grid-template-columns:1fr 1fr;}}
+@media(max-width:560px){.kpi-grid{grid-template-columns:1fr;}}
+.kpi{background:#fff;border:1px solid var(--border);border-radius:16px;padding:18px 20px;position:relative;overflow:hidden;transition:box-shadow .2s,transform .15s;min-height:110px;}
+.kpi:hover{box-shadow:0 8px 28px rgba(0,0,0,.09);transform:translateY(-2px);}
+.kpi-ico{width:42px;height:42px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:1rem;margin-bottom:10px;}
+.kpi-val{font-family:'Plus Jakarta Sans',sans-serif;font-size:1.75rem;font-weight:800;color:var(--text);line-height:1.1;}
+.kpi-lbl{font-size:.71rem;color:var(--muted);font-weight:500;margin-top:3px;text-transform:uppercase;letter-spacing:.04em;}
+.kpi-tag{position:absolute;top:14px;right:14px;font-size:.66rem;font-weight:700;padding:3px 9px;border-radius:20px;}
+.tag-g{background:rgba(34,197,94,.13);color:#15803d;}
+.tag-r{background:rgba(239,68,68,.13);color:#dc2626;}
+.tag-b{background:rgba(59,130,246,.13);color:#2563eb;}
+.kpi-bg{position:absolute;bottom:-14px;right:-14px;width:72px;height:72px;border-radius:50%;opacity:.07;}
+.sum-bar{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px;}
+@media(max-width:1100px){.sum-bar{grid-template-columns:1fr 1fr;}}
+.sm{display:flex;align-items:center;gap:11px;background:#fff;border:1px solid var(--border);border-radius:13px;padding:13px 16px;}
+.sm-ico{width:36px;height:36px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:.85rem;flex-shrink:0;}
+.sm-val{font-family:'Plus Jakarta Sans',sans-serif;font-size:1.1rem;font-weight:800;color:var(--text);}
+.sm-lbl{font-size:.68rem;color:var(--muted);margin-top:1px;}
+/* 5-chart layout */
+.row-top{display:grid;grid-template-columns:62% 38%;gap:14px;margin-bottom:14px;}
+.row-mid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:14px;}
+.row-bot{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;}
+@media(max-width:1050px){.row-top{grid-template-columns:1fr;}.row-mid{grid-template-columns:1fr 1fr;}}
+@media(max-width:700px){.row-mid,.row-bot{grid-template-columns:1fr;}}
+.cc{background:#fff;border:1px solid var(--border);border-radius:16px;padding:18px 20px;box-sizing:border-box;min-height:260px;}
+.cc-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:6px;}
+.cc-t{font-family:'Plus Jakarta Sans',sans-serif;font-size:.86rem;font-weight:700;color:var(--text);display:flex;align-items:center;gap:7px;}
+.cc-sub{font-size:.69rem;color:var(--muted2);background:var(--surface2);border:1px solid var(--border);padding:3px 10px;border-radius:20px;white-space:nowrap;}
+.cc canvas{display:block;width:100%!important;}
+.leg{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;}
+.leg-i{display:flex;align-items:center;gap:5px;font-size:.69rem;color:var(--muted);font-weight:500;}
+.leg-d{width:9px;height:9px;border-radius:3px;flex-shrink:0;}
+.li{display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);}
+.li:last-child{border-bottom:none;}
+.li-ico{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:.72rem;flex-shrink:0;}
+.alt{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:10px;border:1px solid rgba(239,68,68,.18);background:rgba(239,68,68,.04);margin-bottom:7px;}
+.alt:last-child{margin-bottom:0;}
+.hg{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;}
+.hi{background:var(--surface2);border-radius:10px;padding:10px 13px;border:1px solid var(--border);}
+.hi-v{font-family:'Plus Jakarta Sans',sans-serif;font-size:1.1rem;font-weight:800;}
+.hi-l{font-size:.67rem;color:var(--muted2);margin-top:2px;}
+.sk{background:linear-gradient(90deg,var(--surface2) 25%,var(--border) 50%,var(--surface2) 75%);background-size:400% 100%;animation:sh 1.4s infinite;border-radius:6px;}
+@keyframes sh{0%{background-position:200% 0}100%{background-position:-200% 0}}
+/* Quick Links bar */
+.ql-bar{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px;}
+.ql{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:9px;font-size:.75rem;font-weight:600;text-decoration:none;background:#fff;border:1px solid var(--border);color:var(--text);transition:all .15s;}
+.ql:hover{background:var(--accent);color:#fff;border-color:var(--accent);}
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Quick Links -->
+<div class="ql-bar">
+  <a class="ql" href="/admin/inventory"><i class="fas fa-warehouse" style="color:var(--accent)"></i> Inventory</a>
+  <a class="ql" href="/admin/shipments"><i class="fas fa-truck-fast" style="color:#3b82f6"></i> Logistics</a>
+  <a class="ql" href="/admin/purchase-orders"><i class="fas fa-file-invoice" style="color:#6366f1"></i> Purchase Orders</a>
+  <a class="ql" href="/admin/sales-orders"><i class="fas fa-cart-shopping" style="color:#f59e0b"></i> Sales Orders</a>
+  <a class="ql" href="/admin/sales-returns"><i class="fas fa-rotate-left" style="color:#ef4444"></i> Sales Returns</a>
+  <a class="ql" href="/admin/purchase-returns"><i class="fas fa-boxes-packing" style="color:#14b8a6"></i> Purchase Returns</a>
+</div>
+
+<!-- KPI Row -->
+<div class="kpi-grid">
+  <div class="kpi">
+    <div class="kpi-tag tag-b">All Sites</div>
+    <div class="kpi-ico" style="background:rgba(14,107,63,.1);color:var(--accent)"><i class="fas fa-indian-rupee-sign"></i></div>
+    <div class="kpi-val" id="v1">—</div>
+    <div class="kpi-lbl">Total Revenue</div>
+    <div class="kpi-bg" style="background:var(--accent)"></div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-tag tag-b" id="t2">—</div>
+    <div class="kpi-ico" style="background:rgba(59,130,246,.1);color:#3b82f6"><i class="fas fa-boxes-stacked"></i></div>
+    <div class="kpi-val" id="v2">—</div>
+    <div class="kpi-lbl">Units Sold</div>
+    <div class="kpi-bg" style="background:#3b82f6"></div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-tag tag-r" id="t3">—</div>
+    <div class="kpi-ico" style="background:rgba(239,68,68,.1);color:#ef4444"><i class="fas fa-triangle-exclamation"></i></div>
+    <div class="kpi-val" id="v3">—</div>
+    <div class="kpi-lbl">Stockout Items</div>
+    <div class="kpi-bg" style="background:#ef4444"></div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-tag tag-g">Active</div>
+    <div class="kpi-ico" style="background:rgba(168,85,247,.1);color:#a855f7"><i class="fas fa-store"></i></div>
+    <div class="kpi-val" id="v4">—</div>
+    <div class="kpi-lbl">Active Sites</div>
+    <div class="kpi-bg" style="background:#a855f7"></div>
+  </div>
+</div>
+
+<!-- Secondary Stats -->
+<div class="sum-bar">
+  <div class="sm"><div class="sm-ico" style="background:rgba(245,158,11,.1);color:#f59e0b"><i class="fas fa-users"></i></div><div><div class="sm-val" id="su1">—</div><div class="sm-lbl">Total Users</div></div></div>
+  <div class="sm"><div class="sm-ico" style="background:rgba(20,184,166,.1);color:#14b8a6"><i class="fas fa-cube"></i></div><div><div class="sm-val" id="su2">—</div><div class="sm-lbl">Products</div></div></div>
+  <div class="sm"><div class="sm-ico" style="background:rgba(99,102,241,.1);color:#6366f1"><i class="fas fa-file-invoice"></i></div><div><div class="sm-val" id="su3">—</div><div class="sm-lbl">Purchase Orders</div></div></div>
+  <div class="sm"><div class="sm-ico" style="background:rgba(236,72,153,.1);color:#ec4899"><i class="fas fa-truck-fast"></i></div><div><div class="sm-val" id="su4">—</div><div class="sm-lbl">Pending Shipments</div></div></div>
+</div>
+
+<!-- Chart 1 + 2: Revenue Trend & Category Donut -->
+<div class="row-top">
+  <div class="cc">
+    <div class="cc-h">
+      <div class="cc-t"><i class="fas fa-chart-mixed" style="color:#3b82f6"></i>Monthly Revenue &amp; Profit</div>
+      <span class="cc-sub">Last 12 months</span>
+    </div>
+    <div style="position:relative;height:200px;width:100%"><canvas id="cRevenue" height="200"></canvas></div>
+    <div class="leg">
+      <div class="leg-i"><div class="leg-d" style="background:rgba(59,130,246,.6)"></div>Revenue</div>
+      <div class="leg-i"><div class="leg-d" style="background:#10b981;border-radius:50%"></div>Net Profit</div>
+    </div>
+  </div>
+  <div class="cc">
+    <div class="cc-h">
+      <div class="cc-t"><i class="fas fa-chart-pie" style="color:#a855f7"></i>Revenue by Category</div>
+      <span class="cc-sub">Share</span>
+    </div>
+    <div style="position:relative;height:200px;width:100%"><canvas id="cCategory" height="200"></canvas></div>
+  </div>
+</div>
+
+<!-- Chart 3+4+5: Shipment Status, Inventory Health, Orders Pipeline -->
+<div class="row-mid">
+  <div class="cc">
+    <div class="cc-h">
+      <div class="cc-t"><i class="fas fa-truck-fast" style="color:#14b8a6"></i>Shipment Status</div>
+      <span class="cc-sub">Distribution</span>
+    </div>
+    <div style="position:relative;height:160px;width:100%"><canvas id="cShipStatus" height="160"></canvas></div>
+    <div class="leg" id="legShip"></div>
+  </div>
+  <div class="cc">
+    <div class="cc-h">
+      <div class="cc-t"><i class="fas fa-warehouse" style="color:#10b981"></i>Inventory Health</div>
+      <span class="cc-sub">Stock status</span>
+    </div>
+    <div style="position:relative;height:160px;width:100%"><canvas id="cInvHealth" height="160"></canvas></div>
+    <div class="hg" id="hgInv"></div>
+  </div>
+  <div class="cc">
+    <div class="cc-h">
+      <div class="cc-t"><i class="fas fa-filter" style="color:#6366f1"></i>Orders Pipeline</div>
+      <span class="cc-sub">PO &amp; SO by status</span>
+    </div>
+    <div style="position:relative;height:160px;width:100%"><canvas id="cOrders" height="160"></canvas></div>
+    <div class="leg">
+      <div class="leg-i"><div class="leg-d" style="background:#6366f1"></div>Purchase Orders</div>
+      <div class="leg-i"><div class="leg-d" style="background:#f59e0b"></div>Sales Orders</div>
+    </div>
+  </div>
+</div>
+
+<!-- Chart 6+7: Top Sites + Recent Sales & Stockout Alerts -->
+<div class="row-bot">
+  <div class="cc">
+    <div class="cc-h">
+      <div class="cc-t"><i class="fas fa-ranking-star" style="color:#f59e0b"></i>Top Sites by Revenue</div>
+      <span class="cc-sub">Ranked</span>
+    </div>
+    <div style="position:relative;height:200px;width:100%"><canvas id="cTopSites" height="200"></canvas></div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+    <div class="cc">
+      <div class="cc-h">
+        <div class="cc-t"><i class="fas fa-bag-shopping" style="color:#3b82f6"></i>Recent Sales</div>
+        <a href="/admin/sales" style="font-size:.7rem;color:var(--accent);font-weight:600;text-decoration:none">View →</a>
+      </div>
+      <div id="listSales" style="overflow:auto;max-height:200px"></div>
+    </div>
+    <div class="cc">
+      <div class="cc-h">
+        <div class="cc-t"><i class="fas fa-triangle-exclamation" style="color:#ef4444"></i>Stockout Alerts</div>
+        <a href="/admin/inventory" style="font-size:.7rem;color:var(--accent);font-weight:600;text-decoration:none">View →</a>
+      </div>
+      <div id="listStockout" style="overflow:auto;max-height:200px"></div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+Chart.defaults.font.family="'Inter','Plus Jakarta Sans',sans-serif";
+Chart.defaults.font.size=11;
+Chart.defaults.color='#64748b';
+Chart.defaults.plugins.legend.display=false;
+Chart.defaults.plugins.tooltip.backgroundColor='rgba(15,23,42,.92)';
+Chart.defaults.plugins.tooltip.padding=10;
+Chart.defaults.plugins.tooltip.cornerRadius=8;
+Chart.defaults.plugins.tooltip.titleFont={size:12,weight:'bold'};
+
+const PAL=['#3b82f6','#10b981','#f59e0b','#a855f7','#ef4444','#14b8a6','#6366f1','#ec4899','#f97316','#84cc16'];
+const G='#10b981',B='#3b82f6',AM='#f59e0b',PU='#a855f7',RE='#ef4444',TE='#14b8a6',IN='#6366f1';
+
+function fmtR(n){n=Number(n)||0;if(n>=1e7)return'₹'+(n/1e7).toFixed(1)+'Cr';if(n>=1e5)return'₹'+(n/1e5).toFixed(1)+'L';if(n>=1e3)return'₹'+(n/1e3).toFixed(1)+'K';return'₹'+n.toFixed(0);}
+function fmtN(n){n=Number(n)||0;if(n>=1e6)return(n/1e6).toFixed(1)+'M';if(n>=1e3)return(n/1e3).toFixed(1)+'K';return n.toLocaleString();}
+function ctx(id){const el=document.getElementById(id);return el?el.getContext('2d'):null;}
+const chartInstances={};
+function mkChart(id,cfg){if(chartInstances[id]){chartInstances[id].destroy();}const c=ctx(id);if(!c)return;chartInstances[id]=new Chart(c,cfg);return chartInstances[id];}
+function shortMonth(m){try{const[y,mo]=m.split('-');return['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][+mo-1]+' '+y.slice(2);}catch{return m;}}
+
+async function loadKPIs(){
+  const{ok,data}=await apiFetch('/api/dashboard/stats');if(!ok)return;
+  document.getElementById('v1').textContent=fmtR(data.total_revenue||0);
+  document.getElementById('v2').textContent=fmtN(data.units_sold||0);
+  document.getElementById('v3').textContent=data.stockout_count||0;
+  document.getElementById('v4').textContent=data.active_sites||0;
+  document.getElementById('su1').textContent=data.total_users||0;
+  document.getElementById('su2').textContent=fmtN(data.total_products||0);
+  document.getElementById('t2').textContent=fmtN(data.units_sold||0)+' units';
+  const sc=data.stockout_count||0;
+  document.getElementById('t3').textContent=sc>0?sc+' items':'All Clear';
+  document.getElementById('t3').className=sc>0?'kpi-tag tag-r':'kpi-tag tag-g';
+}
+
+async function loadRevenueTrend(){
+  const{ok,data}=await apiFetch('/admin/dashboard/monthly-inventory-metrics');
+  if(!ok||!data.labels?.length)return;
+  const lbl=data.labels.map(shortMonth);
+  const revVals=data.revenue||data.units_sold||[];
+  const profitVals=data.profit||[];
+  mkChart('cRevenue',{type:'bar',data:{labels:lbl,datasets:[
+    {label:'Revenue (₹)',data:revVals,backgroundColor:'rgba(59,130,246,.5)',borderColor:B,borderWidth:1,borderRadius:4,order:2,yAxisID:'y'},
+    {label:'Net Profit (₹)',data:profitVals,type:'line',borderColor:G,borderWidth:2.5,pointRadius:3.5,pointBackgroundColor:G,tension:.35,fill:false,order:1,yAxisID:'y'},
+  ]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+    scales:{
+      y:{grid:{color:'rgba(0,0,0,.05)'},ticks:{callback:v=>fmtR(v)},title:{display:true,text:'Revenue',font:{size:9},color:'#8b8fa8'}},
+      x:{grid:{display:false},ticks:{maxTicksLimit:7}}
+    },
+    plugins:{legend:{display:true,position:'top',labels:{boxWidth:9,font:{size:10},padding:10}}}}});
+}
+
+async function loadCategoryChart(){
+  const{ok,data}=await apiFetch('/api/dashboard/category-revenue');if(!ok||!data.labels?.length)return;
+  mkChart('cCategory',{type:'doughnut',data:{labels:data.labels,datasets:[{data:data.values,backgroundColor:PAL,borderWidth:2,borderColor:'#fff',hoverOffset:5}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'58%',
+      plugins:{legend:{display:true,position:'bottom',labels:{boxWidth:9,font:{size:10},padding:7}},
+      tooltip:{callbacks:{label:c=>`${c.label}: ${fmtR(c.raw||0)}`}}}}});
+}
+
+async function loadShipStatus(){
+  const{ok,data}=await apiFetch('/api/dashboard/shipment-status-breakdown');if(!ok)return;
+  const CM={Delivered:G,'In Transit':B,Pending:AM,Delayed:RE,Cancelled:'#94a3b8',Dispatched:B,'Out for Delivery':AM,'Picked Up':TE,'Dispatched':B};
+  const lbl=data.labels||[],vals=data.values||[];
+  if(!lbl.length)return;
+  mkChart('cShipStatus',{type:'doughnut',data:{labels:lbl,datasets:[{data:vals,backgroundColor:lbl.map(l=>CM[l]||TE),borderWidth:2,borderColor:'#fff'}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'56%',
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.label}: ${c.raw}`}}}}});
+  const total=vals.reduce((a,b)=>a+b,0)||1;
+  document.getElementById('legShip').innerHTML=lbl.map((l,i)=>`<div class="leg-i"><div class="leg-d" style="background:${CM[l]||TE}"></div>${l}: <strong style="color:var(--text)">${vals[i]}</strong> <span style="color:var(--muted2)">(${((vals[i]/total)*100).toFixed(0)}%)</span></div>`).join('');
+}
+
+async function loadInvHealth(){
+  const{ok,data}=await apiFetch('/api/dashboard/inventory-status');if(!ok)return;
+  const vals=[data.in_stock||0,data.low_stock||0,data.stockout||0];
+  mkChart('cInvHealth',{type:'doughnut',data:{labels:['In Stock','Low Stock','Stockout'],datasets:[{data:vals,backgroundColor:[G,AM,RE],borderWidth:2,borderColor:'#fff',hoverOffset:4}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'62%',
+      plugins:{legend:{display:true,position:'right',labels:{boxWidth:9,font:{size:10},padding:7}},tooltip:{callbacks:{label:c=>`${c.label}: ${c.raw} SKUs`}}}}});
+  const total=vals.reduce((a,b)=>a+b,0)||1;
+  const hp=(vals[0]/total*100);
+  document.getElementById('hgInv').innerHTML=`
+    <div class="hi"><div class="hi-v" style="color:${G}">${vals[0]}</div><div class="hi-l">In Stock</div></div>
+    <div class="hi"><div class="hi-v" style="color:${AM}">${vals[1]}</div><div class="hi-l">Low Stock</div></div>
+    <div class="hi"><div class="hi-v" style="color:${RE}">${vals[2]}</div><div class="hi-l">Stockout</div></div>
+    <div class="hi"><div class="hi-v" style="color:${hp>70?G:hp>40?AM:RE}">${hp.toFixed(0)}%</div><div class="hi-l">Health Score</div></div>`;
+}
+
+async function loadOrders(){
+  const[r1,r2]=await Promise.all([apiFetch('/api/dashboard/purchase-orders-status'),apiFetch('/api/dashboard/sales-orders-status')]);
+  const poLabels=r1.ok?r1.data.labels||[]:[];
+  const poValues=r1.ok?r1.data.values||[]:[];
+  const soLabels=r2.ok?r2.data.labels||[]:[];
+  const soValues=r2.ok?r2.data.values||[]:[];
+  const sts=['Pending','Approved','Cancelled','Delivered','Dispatched'];
+  const poMap={},soMap={};
+  poLabels.forEach((l,i)=>poMap[l]=poValues[i]||0);
+  soLabels.forEach((l,i)=>soMap[l]=soValues[i]||0);
+  mkChart('cOrders',{type:'bar',data:{labels:sts,datasets:[
+    {label:'Purchase Orders',data:sts.map(s=>poMap[s]||0),backgroundColor:'rgba(99,102,241,.7)',borderRadius:4},
+    {label:'Sales Orders',data:sts.map(s=>soMap[s]||0),backgroundColor:'rgba(245,158,11,.65)',borderRadius:4},
+  ]},options:{responsive:true,maintainAspectRatio:false,scales:{y:{grid:{color:'rgba(0,0,0,.05)'},ticks:{stepSize:1}},x:{grid:{display:false}}},
+    plugins:{legend:{display:false}}}});
+  const poTotal=poValues.reduce((a,b)=>a+b,0)||0;
+  document.getElementById('su3').textContent=fmtN(poTotal)||'—';
+}
+
+async function loadTopSites(){
+  const{ok,data}=await apiFetch('/api/dashboard/top-sites-revenue');if(!ok)return;
+  const sites=data.sites||[];if(!sites.length)return;
+  mkChart('cTopSites',{type:'bar',data:{labels:sites.map(s=>s.site||'—'),datasets:[{label:'Revenue',data:sites.map(s=>s.revenue||0),
+    backgroundColor:sites.map((_,i)=>PAL[i%PAL.length]+'BB'),borderRadius:5,borderSkipped:false}]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,scales:{x:{grid:{color:'rgba(0,0,0,.05)'},ticks:{callback:v=>fmtR(v)}},y:{grid:{display:false},ticks:{font:{size:10}}}},
+    plugins:{tooltip:{callbacks:{label:c=>'Rev: '+fmtR(c.raw||0)}}}}});
+}
+
+async function loadRecentSales(){
+  const{ok,data}=await apiFetch('/api/dashboard/recent-sales');if(!ok)return;
+  const CLR=['#3b82f6','#10b981','#f59e0b','#a855f7','#ef4444'];
+  document.getElementById('listSales').innerHTML=(data.sales||[]).map((s,i)=>`
+    <div class="li">
+      <div class="li-ico" style="background:${CLR[i%5]}18;color:${CLR[i%5]}"><i class="fas fa-bag-shopping" style="font-size:.68rem"></i></div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:.8rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${s.product||'—'}</div>
+        <div style="font-size:.68rem;color:var(--muted2)">${s.site||'—'} · ${s.date||'—'}</div>
+      </div>
+      <div style="font-size:.8rem;font-weight:700;color:#16a34a;flex-shrink:0">${fmtR(s.revenue||0)}</div>
+    </div>`).join('')||'<div style="padding:20px;text-align:center;color:var(--muted);font-size:.8rem">No recent sales</div>';
+}
+
+async function loadStockoutAlerts(){
+  try{
+    const{ok,data}=await apiFetch('/admin/inventory/list?stockout=yes&page=1');
+    const items=(data?.records||[]).filter(r=>r.stockout_flag==='Yes'||r.current_stock===0).slice(0,4);
+    document.getElementById('listStockout').innerHTML=items.length?items.map(r=>`
+      <div class="alt">
+        <div style="width:30px;height:30px;border-radius:8px;background:rgba(239,68,68,.14);color:#ef4444;display:flex;align-items:center;justify-content:center;font-size:.72rem;flex-shrink:0"><i class="fas fa-exclamation"></i></div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:.79rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.product_name||'—'}</div>
+          <div style="font-size:.68rem;color:var(--muted2)">${r.site_name||'—'} · 0 units</div>
+        </div>
+        <span style="font-size:.67rem;font-weight:700;color:#ef4444;background:rgba(239,68,68,.1);padding:2px 8px;border-radius:20px;white-space:nowrap">Stockout</span>
+      </div>`).join('')
+      :'<div style="padding:20px;text-align:center;color:#16a34a;font-size:.8rem"><i class="fas fa-circle-check" style="margin-right:6px"></i>No stockouts — all clear!</div>';
+  }catch(e){}
+}
+
+async function loadPendingShipments(){
+  const{ok,data}=await apiFetch('/api/dashboard/pending-shipments');if(!ok)return;
+  document.getElementById('su4').textContent=(data.shipments||[]).length||0;
+}
+
+(async()=>{
+  await Promise.all([loadKPIs(),loadRevenueTrend(),loadCategoryChart(),loadShipStatus(),loadInvHealth(),loadOrders(),loadTopSites(),loadRecentSales(),loadStockoutAlerts(),loadPendingShipments()]);
+})();
+</script>
+{% endblock %}

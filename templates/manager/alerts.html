@@ -1,0 +1,61 @@
+{% extends "manager/base.html" %}
+{% block title %}Alerts{% endblock %}
+{% block page_title %}<i class="fas fa-bell" style="color:var(--accent);margin-right:8px"></i>Alerts{% endblock %}
+{% block content %}
+<div class="stats-grid" style="margin-bottom:20px">
+  <div class="stat-card red"><div class="stat-icon"><i class="fas fa-circle-exclamation"></i></div><div><div class="stat-label">Critical</div><div class="stat-value" id="criticalCount">—</div></div></div>
+  <div class="stat-card yellow"><div class="stat-icon"><i class="fas fa-triangle-exclamation"></i></div><div><div class="stat-label">Warnings</div><div class="stat-value" id="warningCount">—</div></div></div>
+  <div class="stat-card teal"><div class="stat-icon"><i class="fas fa-info-circle"></i></div><div><div class="stat-label">Info</div><div class="stat-value" id="infoCount">—</div></div></div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <div class="card-title"><i class="fas fa-bell" style="color:var(--warn)"></i> All Alerts</div>
+    <div class="search-bar">
+      <select class="form-control" id="levelFilter" onchange="loadAlerts()" style="width:140px">
+        <option value="">All Levels</option>
+        <option value="critical">Critical</option>
+        <option value="warning">Warning</option>
+        <option value="info">Info</option>
+      </select>
+    </div>
+  </div>
+  <div id="alertsContainer">
+    <div class="empty-state"><span class="spinner"></span></div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+async function loadAlerts(){
+  const level=document.getElementById('levelFilter').value;
+  let url='/manager/api/alerts';
+  if(level) url+=`?level=${level}`;
+  const el=document.getElementById('alertsContainer');
+  el.innerHTML='<div class="empty-state"><span class="spinner"></span></div>';
+  const {ok,data}=await apiFetch(url);
+  if(!ok){el.innerHTML='<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><p>Error loading alerts</p></div>';return;}
+  const alerts=data.alerts||[];
+  const crit=alerts.filter(a=>a.level==='critical').length;
+  const warn=alerts.filter(a=>a.level==='warning').length;
+  const info=alerts.filter(a=>a.level==='info').length;
+  document.getElementById('criticalCount').textContent=crit;
+  document.getElementById('warningCount').textContent=warn;
+  document.getElementById('infoCount').textContent=info;
+  if(!alerts.length){el.innerHTML='<div class="empty-state"><i class="fas fa-check-circle" style="color:var(--accent3)"></i><p>No alerts — everything looks good!</p></div>';return;}
+  el.innerHTML=alerts.map(a=>`
+    <div class="alert-item ${a.level}" style="margin:0 0 10px">
+      <div class="alert-icon"><i class="fas ${a.level==='critical'?'fa-circle-exclamation':a.level==='warning'?'fa-triangle-exclamation':'fa-info-circle'}"></i></div>
+      <div style="flex:1">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <div style="font-weight:600;font-size:.85rem">${a.title}</div>
+          <span class="badge ${a.level==='critical'?'badge-red':a.level==='warning'?'badge-yellow':'badge-blue'}">${a.level}</span>
+        </div>
+        <div style="font-size:.78rem;color:var(--muted);margin-top:3px">${a.message}</div>
+        ${a.product_id?`<div style="font-size:.72rem;font-family:monospace;color:var(--accent);margin-top:4px">Product: ${a.product_id}</div>`:''}
+      </div>
+    </div>`).join('');
+}
+loadAlerts();
+</script>
+{% endblock %}

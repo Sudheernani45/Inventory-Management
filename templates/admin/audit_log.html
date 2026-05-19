@@ -1,0 +1,190 @@
+{% extends "admin/base.html" %}
+{% block title %}Audit Log{% endblock %}
+{% block page_title %}<i class="fas fa-scroll" style="color:var(--accent);margin-right:8px"></i>Audit Log{% endblock %}
+
+{% block head %}
+<style>
+  .action-badge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:.63rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+  .action-CREATE{background:rgba(34,197,94,.13);color:#22c55e}
+  .action-UPDATE{background:rgba(59,130,246,.13);color:#3b82f6}
+  .action-DELETE{background:rgba(239,68,68,.13);color:#ef4444}
+  .action-LOGIN {background:rgba(232,197,71,.13);color:#e8c547}
+  .action-LOGOUT{background:rgba(139,143,168,.1);color:#8b8fa8}
+  .action-VIEW  {background:rgba(139,92,246,.13);color:#a78bfa}
+  .action-EXPORT{background:rgba(249,115,22,.13);color:#f97316}
+  .module-chip{display:inline-block;padding:2px 8px;border-radius:6px;font-size:.62rem;font-weight:600;background:var(--surface3);color:var(--muted);border:1px solid var(--border)}
+  .audit-detail{font-size:.77rem;color:var(--muted);max-width:340px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:default}
+  .audit-detail:hover{white-space:normal}
+  .filter-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:18px}
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Stats -->
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px">
+  <div class="card" style="padding:18px 20px;margin:0">
+    <div style="font-size:.72rem;color:var(--muted);text-transform:uppercase;font-weight:600;letter-spacing:.06em">Total Events</div>
+    <div style="font-size:1.6rem;font-weight:800;font-family:'Plus Jakarta Sans',sans-serif;color:var(--text);margin-top:4px" id="statTotal">—</div>
+  </div>
+  <div class="card" style="padding:18px 20px;margin:0">
+    <div style="font-size:.72rem;color:var(--muted);text-transform:uppercase;font-weight:600;letter-spacing:.06em">Creates</div>
+    <div style="font-size:1.6rem;font-weight:800;font-family:'Plus Jakarta Sans',sans-serif;color:#22c55e;margin-top:4px" id="statCreate">—</div>
+  </div>
+  <div class="card" style="padding:18px 20px;margin:0">
+    <div style="font-size:.72rem;color:var(--muted);text-transform:uppercase;font-weight:600;letter-spacing:.06em">Deletes</div>
+    <div style="font-size:1.6rem;font-weight:800;font-family:'Plus Jakarta Sans',sans-serif;color:#ef4444;margin-top:4px" id="statDelete">—</div>
+  </div>
+  <div class="card" style="padding:18px 20px;margin:0">
+    <div style="font-size:.72rem;color:var(--muted);text-transform:uppercase;font-weight:600;letter-spacing:.06em">Logins</div>
+    <div style="font-size:1.6rem;font-weight:800;font-family:'Plus Jakarta Sans',sans-serif;color:#e8c547;margin-top:4px" id="statLogin">—</div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header" style="flex-wrap:wrap;gap:12px">
+    <div style="display:flex;align-items:center;gap:10px">
+      <div class="card-title"><i class="fas fa-list-check" style="color:var(--accent)"></i> Application Audit Trail</div>
+      <span id="auditCount" class="badge badge-blue">—</span>
+    </div>
+    <button class="btn btn-sm" onclick="exportCSV()" style="font-size:.78rem;padding:6px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;cursor:pointer;color:var(--text)"><i class="fas fa-download"></i> Export CSV</button>
+  </div>
+
+  <!-- Filters -->
+  <div class="filter-bar">
+    <div class="search-box" style="flex:1;min-width:200px">
+      <i class="fas fa-search"></i>
+      <input type="text" id="auditSearch" class="form-control" placeholder="Search user, detail, resource…" oninput="debounce()"/>
+    </div>
+    <select class="form-control" id="filterAction" style="width:140px" onchange="loadLogs()">
+      <option value="">All Actions</option>
+      <option>CREATE</option><option>UPDATE</option><option>DELETE</option>
+      <option>LOGIN</option><option>LOGOUT</option><option>VIEW</option>
+    </select>
+    <select class="form-control" id="filterModule" style="width:150px" onchange="loadLogs()">
+      <option value="">All Modules</option>
+      <option>Auth</option><option>Users</option><option>Products</option><option>Sites</option>
+      <option>Suppliers</option><option>Inventory</option><option>Shipments</option>
+      <option>Sales Orders</option><option>Purchase Orders</option>
+    </select>
+    <input type="date" class="form-control" id="filterFrom" style="width:145px" onchange="loadLogs()" title="From date"/>
+    <input type="date" class="form-control" id="filterTo" style="width:145px" onchange="loadLogs()" title="To date"/>
+    <button class="btn btn-sm" onclick="clearFilters()" style="font-size:.78rem;padding:6px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;cursor:pointer;color:var(--muted)"><i class="fas fa-xmark"></i> Clear</button>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Timestamp</th>
+          <th>User</th>
+          <th>Role</th>
+          <th>Action</th>
+          <th>Resource</th>
+          <th>Detail</th>
+        </tr>
+      </thead>
+      <tbody id="auditTbody">
+        <tr><td colspan="9" style="text-align:center;padding:40px"><span class="spinner"></span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div id="auditPag" style="display:flex;align-items:center;justify-content:space-between;padding:14px 0 0;font-size:.82rem;color:var(--muted)"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentPage = 1;
+let allLogsCache = [];
+let _debTimer = null;
+
+function debounce(){ clearTimeout(_debTimer); _debTimer = setTimeout(()=>{ currentPage=1; loadLogs(); }, 280); }
+
+function clearFilters(){
+  document.getElementById('auditSearch').value = '';
+  document.getElementById('filterAction').value = '';
+  document.getElementById('filterModule').value = '';
+  document.getElementById('filterFrom').value = '';
+  document.getElementById('filterTo').value = '';
+  currentPage = 1; loadLogs();
+}
+
+async function loadLogs(page){
+  if(page) currentPage = page;
+  const q   = document.getElementById('auditSearch').value.trim();
+  const act = document.getElementById('filterAction').value;
+  const mod = document.getElementById('filterModule').value;
+  const df  = document.getElementById('filterFrom').value;
+  const dt  = document.getElementById('filterTo').value;
+  const params = new URLSearchParams({page: currentPage, q, action: act, module: mod, date_from: df, date_to: dt});
+  const res = await fetch(`/admin/api/audit-log?${params}`);
+  const data = await res.json();
+  renderTable(data.logs || [], data.total || 0);
+}
+
+function renderTable(logs, total){
+  allLogsCache = logs;
+  document.getElementById('auditCount').textContent = total + ' events';
+  document.getElementById('statTotal').textContent  = total;
+
+  // Calculate per-page stats
+  const creates = logs.filter(l => l.action === 'CREATE').length;
+  const deletes = logs.filter(l => l.action === 'DELETE').length;
+  const logins  = logs.filter(l => l.action === 'LOGIN').length;
+  document.getElementById('statCreate').textContent = creates;
+  document.getElementById('statDelete').textContent = deletes;
+  document.getElementById('statLogin').textContent  = logins;
+
+  const tbody = document.getElementById('auditTbody');
+  if (!logs.length){
+    tbody.innerHTML = `<tr><td colspan="9"><div class="empty-state"><i class="fas fa-scroll" style="font-size:2rem;color:var(--muted);opacity:.4"></i><p style="margin-top:12px;color:var(--muted)">No audit entries found</p></div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = logs.map((l,i) => `
+    <tr>
+      <td style="color:var(--muted);font-size:.75rem">${l.id||i+1}</td>
+      <td style="font-size:.75rem;white-space:nowrap;color:var(--muted)">${l.timestamp||'—'}</td>
+      <td style="font-weight:600;font-size:.82rem">${l.user||'—'}</td>
+      <td><span class="module-chip">${l.user_role||'—'}</span></td>
+      <td><span class="action-badge action-${l.action||'VIEW'}">${actionIcon(l.action)} ${l.action||'—'}</span></td>
+      <td style="font-size:.8rem;font-weight:500">${l.resource||'—'}</td>
+      <td><div class="audit-detail" title="${(l.detail||'').replace(/"/g,"'")}">${l.detail||'—'}</div></td>
+    </tr>
+  `).join('');
+
+  // Pagination
+  const perPage = 50;
+  const pages = Math.ceil(total / perPage);
+  const pag = document.getElementById('auditPag');
+  if (pages <= 1){ pag.innerHTML = `<span>${total} records</span>`; return; }
+  let btns = '';
+  const start = Math.max(1, currentPage-3);
+  const end   = Math.min(pages, currentPage+3);
+  if(start>1) btns += `<a class="page-btn" onclick="loadLogs(1)">1</a><span>…</span>`;
+  for(let p=start;p<=end;p++) btns += `<a class="page-btn ${p===currentPage?'active':''}" onclick="loadLogs(${p})">${p}</a>`;
+  if(end<pages) btns += `<span>…</span><a class="page-btn" onclick="loadLogs(${pages})">${pages}</a>`;
+  pag.innerHTML = `<span>${total} total events, page ${currentPage} of ${pages}</span><div style="display:flex;gap:4px">${btns}</div>`;
+}
+
+function actionIcon(action){
+  const map = {CREATE:'fa-plus-circle',UPDATE:'fa-pen',DELETE:'fa-trash',LOGIN:'fa-right-to-bracket',LOGOUT:'fa-right-from-bracket',VIEW:'fa-eye',EXPORT:'fa-download'};
+  return `<i class="fas ${map[action]||'fa-circle-dot'}" style="font-size:.6rem"></i>`;
+}
+
+function exportCSV(){
+  if(!allLogsCache.length){ showToast('No data to export','info'); return; }
+  const headers = ['ID','Timestamp','User','Role','Action','Module','Resource','Detail','IP'];
+  const rows = allLogsCache.map(l => [l.id,l.timestamp,l.user,l.user_role,l.action,l.module,l.resource,(l.detail||'').replace(/,/g,' '),l.ip_address]);
+  const csv  = [headers, ...rows].map(r => r.join(',')).join('\n');
+  const blob = new Blob([csv], {type:'text/csv'});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a'); a.href=url; a.download='audit_log.csv'; a.click();
+  URL.revokeObjectURL(url);
+  showToast('Audit log exported','success');
+}
+
+loadLogs();
+</script>
+{% endblock %}

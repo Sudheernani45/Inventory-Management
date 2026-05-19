@@ -1,0 +1,238 @@
+{% extends "analyst/base.html" %}
+{% block title %}Sales Orders{% endblock %}
+{% block page_title %}Sales Orders{% endblock %}
+{% block content %}
+<style>
+.so-tabs{display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:22px}
+.so-tab{padding:10px 22px;font-size:.85rem;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:2.5px solid transparent;margin-bottom:-2px;transition:all .18s;display:flex;align-items:center;gap:8px;user-select:none}
+.so-tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.so-tab:hover:not(.active){color:var(--text)}
+.tab-badge{background:var(--surface2);color:var(--muted);font-size:.68rem;font-weight:700;padding:2px 7px;border-radius:10px}
+.so-tab.active .tab-badge{background:var(--accent-dim);color:var(--accent)}
+.wh-badge{display:inline-block;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-size:.75rem;font-weight:700;padding:2px 9px;border-radius:6px}
+.badge-shipped{background:rgba(34,197,94,.12);color:#15803d;border:1px solid rgba(34,197,94,.3)}
+.badge-pending{background:rgba(245,158,11,.12);color:#b45309;border:1px solid rgba(245,158,11,.3)}
+.badge-confirmed{background:rgba(59,130,246,.12);color:#1d4ed8;border:1px solid rgba(59,130,246,.3)}
+.badge-cancelled{background:rgba(239,68,68,.1);color:#b91c1c;border:1px solid rgba(239,68,68,.2)}
+.badge-dispatched{background:rgba(139,92,246,.12);color:#6d28d9;border:1px solid rgba(139,92,246,.3)}
+.analyst-banner{background:linear-gradient(135deg,rgba(14,107,63,.08),rgba(59,130,246,.06));border:1px solid rgba(14,107,63,.18);border-radius:12px;padding:13px 18px;margin-bottom:20px;display:flex;align-items:center;gap:12px;font-size:.8rem;color:var(--text)}
+</style>
+
+<div class="analyst-banner">
+  <i class="fas fa-chart-bar" style="color:var(--accent);font-size:1rem"></i>
+  <div><strong>Analyst View</strong> — Read-only order data for analysis. Visit <a href="/analyst/dashboard" style="color:var(--accent)">Dashboard</a> for charts and trend reports.</div>
+</div>
+
+<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+  <div>
+    <h2 style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:1.25rem;color:var(--text);margin:0">Order Management</h2>
+    <p style="color:var(--muted);font-size:.8rem;margin:4px 0 0">Manage sales orders and purchase orders.</p>
+  </div>
+</div>
+
+<div class="so-tabs">
+  <div class="so-tab active" id="tabSO" onclick="switchTab('so')">
+    <i class="fas fa-shopping-cart"></i> Sales Orders <span class="tab-badge" id="tabSOCount">—</span>
+  </div>
+</div>
+
+<!-- Filters -->
+<div style="display:flex;align-items:center;justify-content:space-between;padding:0 0 14px;gap:12px;flex-wrap:wrap">
+  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+    <div class="search-box" style="position:relative">
+      <i class="fas fa-search" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:.78rem"></i>
+      <input type="text" id="soSearch" class="form-control" placeholder="Search order, customer…" style="width:220px;padding-left:30px;font-size:.82rem" oninput="debounce()"/>
+    </div>
+    <select class="form-control" id="soStatusFilter" style="width:148px;font-size:.82rem" onchange="filterSOs()">
+      <option value="">All Statuses</option>
+      <option>Pending</option><option>Confirmed</option><option>Dispatched</option>
+      <option>Delivered</option><option>Cancelled</option>
+    </select>
+    <select class="form-control" id="soWhFilter" style="width:160px;font-size:.82rem" onchange="filterSOs()">
+      <option value="">All Warehouses</option>
+    </select>
+  </div>
+  <span id="soCountLabel" style="font-size:.78rem;color:var(--muted)">Loading…</span>
+</div>
+
+<div class="card" style="padding:0">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>SO#</th><th>CUSTOMER</th><th>WAREHOUSE</th><th>ORDER DATE</th>
+          <th>TOTAL</th><th>STATUS</th><th style="text-align:right">ACTIONS</th>
+        </tr>
+      </thead>
+      <tbody id="soTbody">
+        {% for i in range(6) %}<tr class="skeleton-row"><td colspan="7"><div class="skeleton" style="height:14px"></div></td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div id="soPagination" style="padding:12px 20px"></div>
+</div>
+
+<!-- View Detail Modal -->
+<div id="viewSOModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1000;align-items:center;justify-content:center;backdrop-filter:blur(5px)">
+  <div style="background:var(--surface);border-radius:22px;width:100%;max-width:520px;margin:16px;box-shadow:0 40px 120px rgba(0,0,0,.3);overflow:hidden;max-height:90vh;display:flex;flex-direction:column">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid var(--border);flex-shrink:0">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="width:36px;height:36px;border-radius:10px;background:var(--accent-dim);display:flex;align-items:center;justify-content:center;color:var(--accent)"><i class="fas fa-file-alt"></i></div>
+        <div style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:.95rem;color:var(--text)">Order Details</div>
+      </div>
+      <button onclick="closeViewSOModal()" style="background:var(--surface2);border:1px solid var(--border);border-radius:50%;width:32px;height:32px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--muted)"><i class="fas fa-times"></i></button>
+    </div>
+    <div id="viewSOBody" style="padding:20px 24px;overflow-y:auto;flex:1"></div>
+    <div style="padding:14px 24px;border-top:1px solid var(--border);display:flex;justify-content:flex-end">
+      <button onclick="closeViewSOModal()" class="btn btn-ghost">Close</button>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+const SO_STATUS_BADGE={'Pending':'badge-pending','Confirmed':'badge-confirmed','Dispatched':'badge-dispatched','Delivered':'badge-shipped','Cancelled':'badge-cancelled','Processing':'badge-confirmed'};
+let allSOs=[], currentPage=1, debTimer=null;
+let currentTab='so';
+
+function debounce(){clearTimeout(debTimer);debTimer=setTimeout(()=>filterSOs(),280);}
+
+function switchTab(tab){
+  currentTab=tab;
+  document.getElementById('tabSO').classList.toggle('active',tab==='so');
+  document.getElementById('tabPO').classList.toggle('active',tab==='po');
+  if(tab==='so')loadSOs();else loadPOs();
+}
+
+async function loadSOs(page=1){
+  currentPage=page;
+  const q=document.getElementById('soSearch').value.trim();
+  const tbody=document.getElementById('soTbody');
+  tbody.innerHTML=Array(5).fill(`<tr>${Array(7).fill('<td><div class="skeleton" style="height:12px;width:80%"></div></td>').join('')}</tr>`).join('');
+  try{
+    const {ok,data}=await apiFetch(`/analyst/api/sales-orders?page=${page}&q=${encodeURIComponent(q)}`);
+    if(!ok){tbody.innerHTML='<tr><td colspan="7"><div class="empty-state"><p>Failed to load</p></div></td></tr>';return;}
+    allSOs=data.records||[];
+    document.getElementById('tabSOCount').textContent=data.total||0;
+    const whs=new Set(allSOs.map(o=>o.site).filter(Boolean));
+    const whSel=document.getElementById('soWhFilter');const curWh=whSel.value;
+    whSel.innerHTML='<option value="">All Warehouses</option>';
+    [...whs].sort().forEach(w=>whSel.innerHTML+=`<option value="${w}">${w}</option>`);
+    if(curWh)whSel.value=curWh;
+    filterSOs();
+    renderPag('soPagination',page,data.total,data.per_page||20,'loadSOs');
+  }catch(e){}
+}
+
+function filterSOs(){
+  const status=document.getElementById('soStatusFilter').value;
+  const wh=document.getElementById('soWhFilter').value;
+  const q=(document.getElementById('soSearch').value||'').toLowerCase();
+  let f=allSOs;
+  if(q)f=f.filter(o=>(o.so_number||'').toLowerCase().includes(q)||(o.customer||'').toLowerCase().includes(q));
+  if(status)f=f.filter(o=>o.status===status);
+  if(wh)f=f.filter(o=>(o.site||'')==wh);
+  document.getElementById('soCountLabel').textContent=`${f.length} order${f.length!==1?'s':''}`;
+  renderSOTable(f);
+}
+
+function renderSOTable(orders){
+  const tbody=document.getElementById('soTbody');
+  if(!orders.length){tbody.innerHTML='<tr><td colspan="7"><div class="empty-state"><i class="fas fa-receipt"></i><p>No orders found</p></div></td></tr>';return;}
+  const ICONS={Air:'✈️',Ship:'🚢',Train:'🚂',Truck:'🚛',Road:'🚛'};
+  tbody.innerHTML=orders.map((o,i)=>{
+    const date=(o.created_at||'').substring(0,10)||'—';
+    const dispIcon=o.dispatch_type?ICONS[o.dispatch_type]||'📦':'';
+    return `<tr>
+      <td><a style="font-family:monospace;font-size:.8rem;color:var(--accent);font-weight:700;cursor:pointer;text-decoration:none" onclick="viewSODetail(${i})">${o.so_number||'—'}</a></td>
+      <td style="font-weight:600;font-size:.85rem">${o.customer||o.customer_id||'—'}</td>
+      <td><span class="wh-badge">${o.site||'—'}</span></td>
+      <td style="font-size:.8rem;color:var(--muted)">${date}</td>
+      <td style="font-weight:700">₹${Number(o.total_amount||0).toLocaleString('en-IN',{minimumFractionDigits:2})}</td>
+      <td><span class="badge ${SO_STATUS_BADGE[o.status]||'badge-pending'}">${o.status||'—'}</span></td>
+      <td style="text-align:right">
+        <div style="display:flex;gap:5px;justify-content:flex-end">
+          <button onclick="viewSODetail(${i})" style="width:32px;height:32px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;color:var(--muted)" title="View"><i class="fas fa-eye" style="font-size:.75rem"></i></button>
+          ${o.dispatch_type?`<span style="font-size:.8rem;padding:0 6px;display:flex;align-items:center">${dispIcon}</span>`:''}
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function viewSODetail(i){
+  const o=allSOs[i];if(!o)return;
+  const items=Array.isArray(o.items)?o.items:[];
+  const badge=SO_STATUS_BADGE[o.status]||'badge-pending';
+  document.getElementById('viewSOBody').innerHTML=`
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div style="background:linear-gradient(135deg,#1b3a6b,#1a5ea8);border-radius:14px;padding:18px 20px;color:#fff">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <div>
+            <div style="font-size:.64rem;opacity:.7;text-transform:uppercase;letter-spacing:.09em">Order Reference</div>
+            <div style="font-family:monospace;font-size:1rem;font-weight:800;margin-top:2px">${o.so_number}</div>
+          </div>
+          <span class="badge ${badge}" style="background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.3)">${o.status}</span>
+        </div>
+        <div style="margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,.15);display:flex;justify-content:space-between">
+          <span style="opacity:.75;font-size:.78rem">${o.customer||'—'}</span>
+          <span style="opacity:.75;font-size:.78rem">${o.site||'—'}</span>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="view-field"><div class="view-label">Order Date</div><div class="view-value">${(o.created_at||'').substring(0,10)||'—'}</div></div>
+        <div class="view-field"><div class="view-label">Total Amount</div><div class="view-value highlight">₹${Number(o.total_amount||0).toLocaleString('en-IN',{minimumFractionDigits:2})}</div></div>
+        ${o.dispatch_type?`<div class="view-field"><div class="view-label">Dispatch</div><div class="view-value">${o.dispatch_type}</div></div>`:''}
+      </div>
+    </div>`;
+  document.getElementById('viewSOModal').style.display='flex';
+}
+function closeViewSOModal(){document.getElementById('viewSOModal').style.display='none';}
+
+async function loadPOs(page=1){
+  const tbody=document.getElementById('soTbody');
+  tbody.innerHTML=Array(4).fill(`<tr>${Array(7).fill('<td><div class="skeleton" style="height:12px;width:80%"></div></td>').join('')}</tr>`).join('');
+  try{
+    const {ok,data}=await apiFetch(`/analyst/api/purchase-orders?page=${page}`);
+    if(!ok){tbody.innerHTML='<tr><td colspan="7"><div class="empty-state"><p>Failed</p></div></td></tr>';return;}
+    const pos=data.records||[];
+    document.getElementById('tabPOCount').textContent=data.total||0;
+    document.getElementById('soCountLabel').textContent=`${pos.length} purchase orders`;
+    if(!pos.length){tbody.innerHTML='<tr><td colspan="7"><div class="empty-state"><i class="fas fa-shopping-bag"></i><p>No purchase orders</p></div></td></tr>';return;}
+    tbody.innerHTML=pos.map(o=>`<tr>
+      <td style="font-family:monospace;font-size:.8rem;color:var(--accent);font-weight:700">${o.po_number||'—'}</td>
+      <td style="font-weight:600">${o.supplier||'—'}</td>
+      <td><span class="wh-badge">${o.site||'—'}</span></td>
+      <td style="font-size:.8rem;color:var(--muted)">${(o.created_at||'').substring(0,10)||'—'}</td>
+      <td style="font-weight:700">₹${Number(o.total_cost||0).toLocaleString('en-IN',{minimumFractionDigits:2})}</td>
+      <td><span class="badge ${SO_STATUS_BADGE[o.status]||'badge-pending'}">${o.status||'—'}</span></td>
+      <td></td>
+    </tr>`).join('');
+    renderPag('soPagination',page,data.total,data.per_page||20,'loadPOs');
+  }catch(e){}
+}
+
+function renderPag(elId,page,total,pp,fn){
+  const pages=Math.ceil(total/pp),el=document.getElementById(elId);
+  if(!el||pages<=1){if(el)el.innerHTML=`<span style="font-size:.78rem;color:var(--muted)">${total} total</span>`;return;}
+  const start=(page-1)*pp+1,end=Math.min(page*pp,total);
+  let btns='';
+  for(let i=1;i<=pages;i++){
+    if(i===1||i===pages||(i>=page-2&&i<=page+2))btns+=`<a class="page-btn${i===page?' active':''}" onclick="${fn}(${i})">${i}</a>`;
+    else if(!btns.endsWith('…'))btns+='<span style="color:var(--muted);padding:0 4px">…</span>';
+  }
+  el.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;padding:8px 0 2px">
+    <span style="font-size:.78rem;color:var(--muted)">Showing <strong>${start}–${end}</strong> of <strong>${total}</strong></span>
+    <div style="display:flex;gap:4px">
+      <button class="page-btn${page===1?' disabled':''}" onclick="${fn}(${page-1})" ${page===1?'disabled':''}><i class="fas fa-chevron-left" style="font-size:.6rem"></i></button>
+      ${btns}
+      <button class="page-btn${page===pages?' disabled':''}" onclick="${fn}(${page+1})" ${page===pages?'disabled':''}><i class="fas fa-chevron-right" style="font-size:.6rem"></i></button>
+    </div>
+  </div>`;
+}
+
+document.getElementById('viewSOModal').addEventListener('click',e=>{if(e.target===document.getElementById('viewSOModal'))closeViewSOModal();});
+loadSOs(1);
+</script>
+{% endblock %}

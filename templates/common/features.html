@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Features — INVEXA</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/landing.css') }}"/>
+  <style>
+    .stat-3d{transform-style:preserve-3d;transition:transform .3s,box-shadow .3s;}
+    .stat-3d:hover{transform:perspective(600px) rotateX(-5deg) rotateY(6deg) translateY(-4px);box-shadow:0 20px 40px rgba(0,0,0,.35);}
+    .mobile-nav-btn{display:none;background:none;border:none;color:var(--text);font-size:1.3rem;cursor:pointer;padding:6px;}
+    @media(max-width:768px){
+      .mobile-nav-btn{display:block;}
+      .nav-links{display:none;position:absolute;top:60px;left:0;right:0;background:var(--surface);border-bottom:1px solid var(--border);flex-direction:column;padding:12px 20px;gap:4px;z-index:100;}
+      .nav-links.open{display:flex;}
+    }
+  </style>
+  <style>
+    .stat-3d{transform-style:preserve-3d;transition:transform .3s,box-shadow .3s;}
+    .stat-3d:hover{transform:perspective(600px) rotateX(-5deg) rotateY(6deg) translateY(-4px);box-shadow:0 20px 40px rgba(0,0,0,.35);}
+    .mobile-nav-btn{display:none;background:none;border:none;color:var(--text);font-size:1.3rem;cursor:pointer;padding:6px;}
+    @media(max-width:768px){.mobile-nav-btn{display:block;}.nav-links{display:none;position:absolute;top:60px;left:0;right:0;background:var(--surface);border-bottom:1px solid var(--border);flex-direction:column;padding:12px 20px;gap:4px;z-index:100;}.nav-links.open{display:flex;}}
+  </style>
+</head>
+<body>
+
+<nav class="public-nav">
+  <a href="{{ url_for('common.home') }}" class="nav-brand">
+    <div class="logo-box"><i class="fas fa-boxes-stacked" style="color:#1a3a2a;font-size:13px"></i></div>
+    <span class="brand-name">INVEXA</span>
+  </a>
+  <ul class="nav-links" id="navLinks">
+    <li><a href="{{ url_for('common.home') }}">Home</a></li>
+    <li><a href="{{ url_for('common.about') }}">About</a></li>
+    <li><a href="{{ url_for('common.features') }}" class="active">Features</a></li>
+    <li><a href="{{ url_for('common.contact') }}">Contact</a></li>
+  </ul>
+  <div class="nav-cta">
+    <button class="mobile-nav-btn" id="mobileNavBtn" aria-label="Toggle menu"><i class="fas fa-bars"></i></button>
+    {% if session.get('role') %}
+      <div class="nav-user-pill">
+        <div class="nav-user-avatar">{{ session.get('username','U')[0].upper() }}</div>
+        <span class="nav-user-name">{{ session.get('username','User') }}</span>
+      </div>
+      {% if session.get('role') == 'admin' %}
+        <a href="/admin/dashboard" class="nav-portal-badge"><span class="nav-portal-dot"></span>Admin Portal</a>
+      {% elif session.get('role') == 'analyst' %}
+        <a href="/analyst/dashboard" class="nav-portal-badge analyst"><span class="nav-portal-dot"></span>Analytics Portal</a>
+      {% else %}
+        <a href="/manager/dashboard" class="nav-portal-badge"><span class="nav-portal-dot"></span>Manager Portal</a>
+      {% endif %}
+      <a href="/logout" class="btn-nav-login" style="background:rgba(239,68,68,.12);color:#ef4444;border:1px solid rgba(239,68,68,.2)"><i class="fas fa-arrow-right-from-bracket"></i> Sign Out</a>
+    {% else %}
+      <a href="{{ url_for('auth.login') }}" class="btn-nav-login"><i class="fas fa-arrow-right-to-bracket"></i> Sign In</a>
+    {% endif %}
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero hero-sm">
+  <div class="hero-grid-bg"></div>
+  <div class="hero-glow"></div>
+  <div class="hero-inner">
+    <div class="hero-badge"><span class="badge-dot"></span>Full Feature Suite</div>
+    <h1 class="hero-title">Everything you need.<br/><span class="highlight">Nothing you don't.</span></h1>
+    <p class="hero-desc">A complete suite of tools designed to give you total control of your inventory, orders, and supply chain — in one platform.</p>
+  </div>
+</section>
+
+<!-- LIVE INVENTORY STATS TEASER -->
+<section class="section-alt" style="padding:40px 0">
+  <div class="section-inner">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px">
+      <div class="live-stat-card stat-3d">
+        <div class="live-stat-num count-up" data-val="{{ stats.products|default(0) }}" id="fProducts">{{ stats.products|default(0) }}</div>
+        <div class="live-stat-label">Products Tracked</div>
+      </div>
+      <div class="live-stat-card stat-3d">
+        <div class="live-stat-num count-up" data-val="{{ stats.in_stock|default(0) }}" id="fInStock">{{ stats.in_stock|default(0) }}</div>
+        <div class="live-stat-label">In-Stock Items</div>
+      </div>
+      <div class="live-stat-card stat-3d">
+        <div class="live-stat-num count-up" data-val="{{ stats.low_stock|default(0) }}" id="fLowStock">{{ stats.low_stock|default(0) }}</div>
+        <div class="live-stat-label">Low Stock Alerts</div>
+      </div>
+      <div class="live-stat-card stat-3d">
+        <div class="live-stat-num count-up" data-val="{{ stats.sites|default(0) }}" id="fSites">{{ stats.sites|default(0) }}</div>
+        <div class="live-stat-label">Active Sites</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURE DEEP DIVES — Redesigned -->
+<section class="section">
+  <div class="section-inner">
+
+    <!-- 1. INVENTORY -->
+    <div class="feat-block">
+      <div class="feat-block-content">
+        <div class="feat-block-tag" style="color:var(--teal);background:var(--teal-lt);border-color:var(--teal-border)">
+          <i class="fas fa-warehouse"></i> Inventory
+        </div>
+        <h2 class="feat-block-heading">Real-Time Stock Tracking</h2>
+        <p class="feat-block-desc">Monitor every SKU in real-time across all your locations. Drill into any product to see its full history — receipts, sales, transfers, and adjustments — from a single dashboard.</p>
+        <ul class="feat-block-list" style="--fbl-bg:rgba(13,122,107,.1)">
+          <li><span>Live stock level updates with no page refresh required</span></li>
+          <li><span>Multi-site inventory visibility from one dashboard</span></li>
+          <li><span>Full product audit trail and adjustment history</span></li>
+          <li><span>Low-stock and stockout alerts with configurable thresholds</span></li>
+        </ul>
+      </div>
+      <div class="feat-block-visual" style="--fv-bg:linear-gradient(135deg,#074d45,#0d7a6b)">
+        <div class="fv-icon"><i class="fas fa-warehouse"></i></div>
+        <div class="fv-title">Stock Dashboard</div>
+        <div class="fv-sub">Live inventory across all sites</div>
+        <div class="fv-stat-row">
+          <div class="fv-stat">
+            <div class="fv-stat-num" style="color:#a7f3d0" id="fInStockB">{{ stats.in_stock|default(0) }}</div>
+            <div class="fv-stat-label">In Stock</div>
+          </div>
+          <div class="fv-stat">
+            <div class="fv-stat-num" style="color:#fed7aa" id="fLowStockB">{{ stats.low_stock|default(0) }}</div>
+            <div class="fv-stat-label">Low Stock</div>
+          </div>
+        </div>
+        <div class="fv-items" style="margin-top:14px">
+          <div class="fv-item">
+            <span class="fv-item-label"><i class="fas fa-boxes-stacked" style="margin-right:7px;opacity:.7"></i>Products Tracked</span>
+            <span class="fv-item-badge fv-badge-green">{{ stats.products|default(0) }} active</span>
+          </div>
+          <div class="fv-item">
+            <span class="fv-item-label"><i class="fas fa-store" style="margin-right:7px;opacity:.7"></i>Active Sites</span>
+            <span class="fv-item-badge fv-badge-teal">{{ stats.sites|default(0) }} sites</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. ORDERS -->
+    <div class="feat-block flip">
+      <div class="feat-block-content">
+        <div class="feat-block-tag" style="color:#f97316;background:rgba(249,115,22,.08);border-color:rgba(249,115,22,.2)">
+          <i class="fas fa-file-invoice"></i> Orders
+        </div>
+        <h2 class="feat-block-heading">Purchase &amp; Sales Orders</h2>
+        <p class="feat-block-desc">Create, approve, and track purchase orders from suppliers and sales orders to customers — all with a complete lifecycle timeline, auto-generated IDs, and supplier notifications built in.</p>
+        <ul class="feat-block-list" style="--fbl-bg:rgba(249,115,22,.1)">
+          <li><span>Auto-generate purchase orders at reorder threshold</span></li>
+          <li><span>Full PO lifecycle: Draft → Approved → Received</span></li>
+          <li><span>Multi-product sales orders with customer tracking</span></li>
+          <li><span>Order history with full line-item detail and status</span></li>
+        </ul>
+      </div>
+      <div class="feat-block-visual" style="--fv-bg:linear-gradient(135deg,#7c2d12,#f97316)">
+        <div class="fv-icon" style="background:rgba(255,255,255,.15)"><i class="fas fa-file-invoice"></i></div>
+        <div class="fv-title">Order Management</div>
+        <div class="fv-sub">Full order lifecycle tracking</div>
+        <div class="fv-items">
+          <div class="fv-item">
+            <span class="fv-item-label"><i class="fas fa-arrow-up" style="margin-right:7px;opacity:.7"></i>Purchase Orders</span>
+            <span class="fv-item-badge fv-badge-green">Active</span>
+          </div>
+          <div class="fv-item">
+            <span class="fv-item-label"><i class="fas fa-cart-shopping" style="margin-right:7px;opacity:.7"></i>Sales Orders</span>
+            <span class="fv-item-badge fv-badge-green">Active</span>
+          </div>
+          <div class="fv-item">
+            <span class="fv-item-label"><i class="fas fa-people-arrows" style="margin-right:7px;opacity:.7"></i>Supplier Management</span>
+            <span class="fv-item-badge fv-badge-teal">Integrated</span>
+          </div>
+          <div class="fv-item">
+            <span class="fv-item-label"><i class="fas fa-truck-fast" style="margin-right:7px;opacity:.7"></i>Logistics Tracking</span>
+            <span class="fv-item-badge fv-badge-blue">Live</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. ANALYTICS -->
+    <div class="feat-block">
+      <div class="feat-block-content">
+        <div class="feat-block-tag" style="color:#3b82f6;background:rgba(59,130,246,.08);border-color:rgba(59,130,246,.2)">
+          <i class="fas fa-chart-line"></i> Analytics
+        </div>
+        <h2 class="feat-block-heading">Sales Reports &amp; Insights</h2>
+        <p class="feat-block-desc">Interactive dashboards for sales trends, seasonal patterns, and top-performing products. Revenue breakdowns by category, site-by-site comparison, and dedicated analyst role access — all built in.</p>
+        <ul class="feat-block-list" style="--fbl-bg:rgba(59,130,246,.1)">
+          <li><span>Daily, weekly, and monthly sales breakdown charts</span></li>
+          <li><span>Top products by revenue and units sold</span></li>
+          <li><span>Seasonal planning with historical comparison</span></li>
+          <li><span>Dedicated read-only Analyst portal for data teams</span></li>
+        </ul>
+      </div>
+      <div class="feat-block-visual" style="--fv-bg:linear-gradient(135deg,#1e3a8a,#3b82f6)">
+        <div class="fv-icon"><i class="fas fa-chart-line"></i></div>
+        <div class="fv-title">Analytics Dashboard</div>
+        <div class="fv-sub">Revenue &amp; sales trend visualisation</div>
+        <div class="fv-items">
+          <div class="fv-item">
+            <span class="fv-item-label"><i class="fas fa-indian-rupee-sign" style="margin-right:7px;opacity:.7"></i>Total Revenue</span>
+            <span class="fv-item-badge fv-badge-green">Live chart</span>
+          </div>
+          <div class="fv-item">
+            <span class="fv-item-label"><i class="fas fa-chart-pie" style="margin-right:7px;opacity:.7"></i>Category Breakdown</span>
+            <span class="fv-item-badge fv-badge-blue">Donut chart</span>
+          </div>
+          <div class="fv-item">
+            <span class="fv-item-label"><i class="fas fa-trophy" style="margin-right:7px;opacity:.7"></i>Top Products</span>
+            <span class="fv-item-badge fv-badge-teal">Ranked list</span>
+          </div>
+          <div class="fv-item">
+            <span class="fv-item-label"><i class="fas fa-user-chart" style="margin-right:7px;opacity:.7"></i>Analyst Role</span>
+            <span class="fv-item-badge fv-badge-blue">Read-only portal</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. COMPLIANCE -->
+    <div class="feat-block flip">
+      <div class="feat-block-content">
+        <div class="feat-block-tag" style="color:#6d28d9;background:rgba(109,40,217,.08);border-color:rgba(109,40,217,.2)">
+          <i class="fas fa-scroll"></i> Compliance
+        </div>
+        <h2 class="feat-block-heading">Full Audit Logging</h2>
+        <p class="feat-block-desc">Every action in INVEXA is permanently recorded — who changed what, when, and from where. Immutable, filterable, and exportable for compliance reviews or internal accountability checks.</p>
+        <ul class="feat-block-list" style="--fbl-bg:rgba(109,40,217,.1)">
+          <li><span>Timestamp, user, and action recorded for every event</span></li>
+          <li><span>Filter by user, action type, module, or date range</span></li>
+          <li><span>Immutable log entries — nothing can be hidden or deleted</span></li>
+          <li><span>Exportable audit reports for compliance review</span></li>
+        </ul>
+      </div>
+      <div class="feat-block-visual" style="--fv-bg:linear-gradient(135deg,#2e1065,#6d28d9)">
+        <div class="fv-icon"><i class="fas fa-scroll"></i></div>
+        <div class="fv-title">Audit Log</div>
+        <div class="fv-sub">Complete accountability trail</div>
+        <div class="fv-items">
+          <div class="fv-item">
+            <span class="fv-item-label"><i class="fas fa-user" style="margin-right:7px;opacity:.7"></i>User Actions</span>
+            <span class="fv-item-badge fv-badge-blue">All roles</span>
+          </div>
+          <div class="fv-item">
+            <span class="fv-item-label"><i class="fas fa-clock" style="margin-right:7px;opacity:.7"></i>Timestamps</span>
+            <span class="fv-item-badge fv-badge-green">Precise</span>
+          </div>
+          <div class="fv-item">
+            <span class="fv-item-label"><i class="fas fa-filter" style="margin-right:7px;opacity:.7"></i>Filter &amp; Search</span>
+            <span class="fv-item-badge fv-badge-teal">Advanced</span>
+          </div>
+          <div class="fv-item">
+            <span class="fv-item-label"><i class="fas fa-file-export" style="margin-right:7px;opacity:.7"></i>Export Reports</span>
+            <span class="fv-item-badge fv-badge-blue">CSV ready</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ALL FEATURES GRID -->
+<section class="section-alt">
+  <div class="section-inner">
+    <div class="section-header center">
+      <span class="section-eyebrow">All Features</span>
+      <h2 class="section-title">The complete toolkit</h2>
+    </div>
+    <div class="features-grid">
+      <div class="feature-card"><div class="feature-icon"><i class="fas fa-satellite-dish"></i></div><h3 class="feature-title">Real-Time Tracking</h3><p class="feature-desc">Live stock levels across every warehouse and site.</p></div>
+      <div class="feature-card"><div class="feature-icon"><i class="fas fa-bell"></i></div><h3 class="feature-title">Smart Alerts</h3><p class="feature-desc">Low-stock and out-of-stock notifications per product.</p></div>
+      <div class="feature-card"><div class="feature-icon"><i class="fas fa-chart-line"></i></div><h3 class="feature-title">Sales Analytics</h3><p class="feature-desc">Trend charts, seasonal patterns, and top-product reports.</p></div>
+      <div class="feature-card"><div class="feature-icon"><i class="fas fa-truck-fast"></i></div><h3 class="feature-title">Shipment Tracking</h3><p class="feature-desc">Full lifecycle visibility from dispatch to delivery.</p></div>
+      <div class="feature-card"><div class="feature-icon"><i class="fas fa-file-invoice"></i></div><h3 class="feature-title">Purchase Orders</h3><p class="feature-desc">Auto-generate and manage POs at threshold.</p></div>
+      <div class="feature-card"><div class="feature-icon"><i class="fas fa-cart-shopping"></i></div><h3 class="feature-title">Sales Orders</h3><p class="feature-desc">Complete sales order management with customer tracking.</p></div>
+      <div class="feature-card"><div class="feature-icon"><i class="fas fa-tag"></i></div><h3 class="feature-title">Promotions</h3><p class="feature-desc">Create and manage product promotions and seasonal discounts.</p></div>
+      <div class="feature-card"><div class="feature-icon"><i class="fas fa-scroll"></i></div><h3 class="feature-title">Audit Logging</h3><p class="feature-desc">Every system action permanently recorded and filterable.</p></div>
+      <div class="feature-card"><div class="feature-icon"><i class="fas fa-users-cog"></i></div><h3 class="feature-title">Role-Based Access</h3><p class="feature-desc">Admin and manager portals with granular permissions.</p></div>
+    </div>
+  </div>
+</section>
+
+<footer class="site-footer">
+  <div class="footer-grid">
+    <div>
+      <div class="footer-brand-name"><i class="fas fa-boxes-stacked" style="color:var(--accent)"></i>INVEXA</div>
+      <p class="footer-desc">INVEXA.</p>
+    </div>
+    <div class="footer-col"><div class="footer-col-title">Product</div><a href="{{ url_for('common.features') }}">Features</a><a href="#">Pricing</a></div>
+    <div class="footer-col"><div class="footer-col-title">Company</div><a href="{{ url_for('common.about') }}">About</a><a href="{{ url_for('common.contact') }}">Contact</a></div>
+    <div class="footer-col"><div class="footer-col-title">Support</div><a href="#">Help Centre</a><a href="#">Privacy Policy</a></div>
+  </div>
+  <div class="footer-bottom"><span>© 2025 INVEXA. All rights reserved.</span></div>
+</footer>
+
+<script>
+(function(){
+  const btn=document.getElementById('mobileNavBtn');
+  const links=document.querySelector('.nav-links');
+  if(btn&&links) btn.addEventListener('click',()=>links.classList.toggle('open'));
+})();
+(function(){
+  const counters=document.querySelectorAll('.count-up');
+  if(!counters.length) return;
+  const observer=new IntersectionObserver(entries=>{
+    entries.forEach(entry=>{
+      if(!entry.isIntersecting) return;
+      const el=entry.target;const target=parseInt(el.dataset.val)||0;
+      if(!target){el.textContent='0';return;}
+      let start=0;
+      const step=ts=>{if(!start)start=ts;const p=Math.min((ts-start)/1200,1);const e=1-Math.pow(1-p,3);el.textContent=Math.floor(e*target).toLocaleString();if(p<1)requestAnimationFrame(step);else el.textContent=target.toLocaleString();};
+      requestAnimationFrame(step);observer.unobserve(el);
+    });
+  },{threshold:0.2});
+  counters.forEach(c=>observer.observe(c));
+})();
+
+// Realtime stats polling
+async function refreshFeaturesStats(){
+  try{
+    const r=await fetch('/api/platform-stats');
+    if(!r.ok) return;
+    const d=await r.json();
+    const map={'fProducts':d.products,'fSites':d.sites,'fInStock':d.in_stock,'fLowStock':d.low_stock};
+    Object.entries(map).forEach(([id,val])=>{
+      const el=document.getElementById(id);
+      if(el){el.textContent=(val||0).toLocaleString();el.dataset.val=val||0;}
+    });
+  }catch(e){}
+}
+setInterval(refreshFeaturesStats,60000);
+
+</script>
+</body>
+</html>

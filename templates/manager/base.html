@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>INVEXA Manager — {% block title %}{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/theme.css') }}"/>
+  <style>
+    .alert-item{display:flex;align-items:flex-start;gap:12px;padding:14px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;transition:border-color .15s;}
+    .alert-item:hover{border-color:var(--border-md);}
+    .alert-icon{width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:.85rem;flex-shrink:0;}
+    .alert-item.critical .alert-icon{background:var(--danger-dim);color:var(--danger);}
+    .alert-item.warning .alert-icon{background:var(--warn-dim);color:var(--warn);}
+    .alert-item.info .alert-icon{background:var(--accent-lt);color:var(--accent);}
+    .card-title i, .chart-title i, .kpi-icon, .kpi-icon * { color: var(--green-brand) !important; }
+    input[readonly]{background:var(--surface2);color:var(--muted);cursor:not-allowed;}
+    .hamburger{display:none;background:none;border:none;cursor:pointer;padding:8px;color:var(--text);font-size:1.2rem;}
+    .sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:199;}
+    @media(max-width:768px){
+      .hamburger{display:flex;align-items:center;justify-content:center;}
+      .sidebar{transform:translateX(-100%);transition:transform .25s ease;z-index:200;}
+      .sidebar.open{transform:translateX(0);}
+      .sidebar-overlay.open{display:block;}
+      .main{margin-left:0!important;}
+      .topbar{padding:0 12px;}
+      .content{padding:12px!important;}
+    }
+  </style>
+  {% block head %}{% endblock %}
+</head>
+<body class="role-manager">
+
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-icon"><i class="fas fa-boxes-stacked" style="font-size:.85rem"></i></div>
+    <div>
+      <span class="logo-text">INVEXA</span>
+      <span class="logo-sub">Manager Portal</span>
+    </div>
+  </div>
+<nav class="nav-section">
+    <div class="nav-label">Overview</div>
+    <a class="nav-item {% if request.endpoint == 'manager.dashboard' %}active{% endif %}" href="/manager/dashboard">
+      <div class="nav-icon"><i class="fas fa-chart-pie"></i></div> Dashboard
+    </a>
+
+    <div class="nav-label">Inventory</div>
+    <a class="nav-item {% if request.endpoint == 'manager.products' %}active{% endif %}" href="/manager/products">
+      <div class="nav-icon"><i class="fas fa-boxes-stacked"></i></div> Products
+    </a>
+    <a class="nav-item {% if request.endpoint == 'manager.inventory' %}active{% endif %}" href="/manager/inventory">
+      <div class="nav-icon"><i class="fas fa-warehouse"></i></div> Inventory
+    </a>
+
+    <div class="nav-label">Orders</div>
+    <a class="nav-item {% if request.endpoint == 'manager.purchase_orders' %}active{% endif %}" href="/manager/purchase-orders">
+      <div class="nav-icon"><i class="fas fa-file-invoice"></i></div> Purchase Orders
+    </a>
+    <a class="nav-item {% if request.endpoint == 'manager.sales_orders' %}active{% endif %}" href="/manager/sales-orders">
+      <div class="nav-icon"><i class="fas fa-cart-shopping"></i></div> Sales Orders
+    </a>
+
+    <div class="nav-label">Management</div>
+    <a class="nav-item {% if request.endpoint == 'manager.customers' %}active{% endif %}" href="/manager/customers">
+      <div class="nav-icon"><i class="fas fa-user-group"></i></div> Customers
+    </a>
+    <a class="nav-item {% if request.endpoint == 'manager.suppliers_page' %}active{% endif %}" href="/manager/suppliers">
+      <div class="nav-icon"><i class="fas fa-truck-ramp-box"></i></div> Suppliers
+    </a>
+
+    <div class="nav-label">Operations</div>
+    <a class="nav-item {% if request.endpoint == 'manager.shipments_page' %}active{% endif %}" href="/manager/shipments">
+      <div class="nav-icon"><i class="fas fa-truck-fast"></i></div> Logistics
+    </a>
+
+    <div class="nav-label">Returns</div>
+    <a class="nav-item {% if request.endpoint == 'manager.sales_returns_page' %}active{% endif %}" href="/manager/sales-returns">
+      <div class="nav-icon"><i class="fas fa-rotate-left"></i></div> Sales Returns
+    </a>
+    <a class="nav-item {% if request.endpoint == 'manager.purchase_returns_page' %}active{% endif %}" href="/manager/purchase-returns">
+      <div class="nav-icon"><i class="fas fa-boxes-packing"></i></div> Purchase Returns
+    </a>
+
+    <div class="nav-label">Planning</div>
+    <a class="nav-item {% if request.endpoint == 'manager.promotions_page' %}active{% endif %}" href="/manager/promotions">
+      <div class="nav-icon"><i class="fas fa-tag"></i></div> Promotions
+    </a>
+
+    <div class="nav-label">Sites</div>
+    <a class="nav-item {% if request.endpoint == 'manager.site_view' %}active{% endif %}" href="/manager/site">
+      <div class="nav-icon"><i class="fas fa-store"></i></div> My Site
+    </a>
+    <a class="nav-item {% if request.endpoint == 'manager.sites' %}active{% endif %}" href="/manager/sites">
+      <div class="nav-icon"><i class="fas fa-building"></i></div> All Sites
+    </a>
+  </nav>
+
+  <div class="sidebar-user">
+    <div class="user-avatar" id="sidebarAvatar">M</div>
+    <div class="user-info">
+      <div class="name" id="sidebarUsername">Manager</div>
+      <div class="role">Manager</div>
+    </div>
+    <div class="logout-btn" onclick="logout()" title="Sign Out" style="display:flex;align-items:center;gap:5px;font-size:.74rem;font-weight:600;padding:6px 9px"><i class="fas fa-arrow-right-from-bracket"></i><span>Sign Out</span></div>
+  </div>
+</aside>
+
+<div class="main">
+  <div class="topbar">
+    <div style="display:flex;align-items:center;gap:10px">
+      <button class="hamburger" onclick="openSidebar()" aria-label="Menu"><i class="fas fa-bars"></i></button>
+      <div class="page-heading"><i class="fas fa-chart-pie" style="color:var(--green-brand);margin-right:8px;font-size:.85rem"></i>{% block page_title %}{% endblock %}</div>
+    </div>
+    <div class="topbar-right">
+      
+      <a href="/home" class="topbar-home"><i class="fas fa-house"></i> <span class="hide-xs">Home</span></a>
+      <div class="topbar-user">
+        <div class="topbar-avatar" id="topbarAvatar">M</div>
+        <span class="topbar-name hide-xs" id="topbarUsername">Manager</span>
+        <span class="badge-role hide-xs">Manager</span>
+      </div>
+    </div>
+  </div>
+  <div class="content">{% block content %}{% endblock %}</div>
+</div>
+
+<div id="toast-container"></div>
+
+<script>
+function showToast(msg, type='info') {
+  const icons={success:'fa-circle-check',error:'fa-circle-exclamation',info:'fa-circle-info'};
+  const colors={success:'var(--success)',error:'var(--danger)',info:'var(--info)'};
+  const t=document.createElement('div'); t.className=`toast ${type}`;
+  t.innerHTML=`<i class="fas ${icons[type]}" style="color:${colors[type]};font-size:.9rem"></i><span>${msg}</span>`;
+  document.getElementById('toast-container').appendChild(t);
+  setTimeout(()=>{t.style.opacity='0';t.style.transform='translateX(12px)';t.style.transition='.22s';setTimeout(()=>t.remove(),240);},3200);
+}
+async function apiFetch(url,options={}) {
+  const res=await fetch(url,{headers:{'Content-Type':'application/json'},...options});
+  const ct=res.headers.get('content-type')||'';
+  if(!ct.includes('application/json')){
+    console.error('apiFetch: expected JSON but got',ct,'from',url);
+    return {ok:false,status:res.status,data:{}};
+  }
+  const data=await res.json(); return {ok:res.ok,status:res.status,data};
+}
+async function logout(){window.location.href='/logout';}
+function openSidebar(){document.getElementById('sidebar').classList.add('open');document.getElementById('sidebarOverlay').classList.add('open');}
+function closeSidebar(){document.getElementById('sidebar').classList.remove('open');document.getElementById('sidebarOverlay').classList.remove('open');}
+// ── FIX 1: Preserve sidebar scroll position ──
+(function(){
+  const SIDEBAR_KEY='ifms_mgr_sidebar_scroll';
+  const sidebar=document.getElementById('sidebar');
+  const navSection=sidebar.querySelector('.nav-section');
+  if(!navSection) return;
+  const saved=sessionStorage.getItem(SIDEBAR_KEY);
+  if(saved) navSection.scrollTop=parseInt(saved,10)||0;
+  document.querySelectorAll('.nav-item').forEach(link=>{
+    link.addEventListener('click',function(){sessionStorage.setItem(SIDEBAR_KEY, navSection.scrollTop);});
+  });
+})();
+// Dark theme fixed
+document.documentElement.removeAttribute('data-theme');
+(async()=>{
+  try{
+    const res=await fetch('/api/me');
+    if(res.ok){const u=await res.json();const name=u.name||u.username||'Manager';const init=name[0].toUpperCase();
+      ['sidebarUsername','topbarUsername'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent=name;});
+      ['sidebarAvatar','topbarAvatar'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent=init;});}
+  }catch(e){}
+  try{
+    const r2=await fetch('/manager/api/alert-count');
+    if(r2.ok){const d=await r2.json();const cnt=d.count||0;
+      const badge=document.getElementById('sidebarAlertBadge');
+      if(badge&&cnt>0){badge.textContent=cnt>99?'99+':cnt;badge.style.display='inline-block';}}
+  }catch(e){}
+})();
+</script>
+<style>.hide-xs{display:inline}@media(max-width:480px){.hide-xs{display:none}}
+/* ── Global No Horizontal Scroll ── */
+*, *::before, *::after { box-sizing: border-box; }
+html, body { overflow-x: hidden; max-width: 100vw; }
+.main { overflow-x: hidden; }
+.content { overflow-x: hidden; max-width: 100%; }
+.row2, .row3, .row4, .kpi-grid, .sum-bar, .ig-grid, .insight-grid, .health-grid {
+  min-width: 0;
+  width: 100%;
+}
+.cc, .kpi, .sm, .ig { min-width: 0; }
+canvas { max-width: 100% !important; }
+
+/* ── Mobile Responsive ── */
+@media(max-width:768px){
+  :root{--sidebar-w:0px;}
+  .sidebar{transform:translateX(-100%);transition:transform .25s ease;z-index:200;position:fixed;}
+  .sidebar.mobile-open{transform:translateX(0);}
+  .main{margin-left:0!important;max-width:100vw;}
+  .topbar{padding:0 14px;}
+  .content{padding:14px;}
+  .kpi-grid,.sum-bar,.ig-grid{grid-template-columns:1fr 1fr!important;}
+  .row2,.row3,.row4{grid-template-columns:1fr!important;}
+  table{font-size:.74rem;}
+  .modal{margin:12px;max-height:94vh;}
+  .stat-card-row{grid-template-columns:1fr 1fr!important;}
+}
+@media(max-width:420px){
+  .kpi-grid,.sum-bar{grid-template-columns:1fr!important;}
+}
+/* Mobile hamburger btn */
+.mobile-menu-btn{display:none;background:none;border:none;cursor:pointer;padding:8px;color:var(--text);font-size:1.1rem;}
+@media(max-width:768px){.mobile-menu-btn{display:flex;align-items:center;justify-content:center;}}
+.sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:199;}
+.sidebar-overlay.show{display:block;}
+</style>
+<!-- FIX 6: Universal premium pagination -->
+<script>
+function renderPag(elId, page, total, pp, fn) {
+  const pages = Math.ceil(total / pp);
+  const el = document.getElementById(elId);
+  if (!el) return;
+  if (pages <= 1) {
+    el.innerHTML = `<span style="font-size:.78rem;color:var(--muted)">${total} record${total!==1?'s':''}</span>`;
+    return;
+  }
+  const start=(page-1)*pp+1, end=Math.min(page*pp,total);
+  const delta=2; let range=[], left=page-delta, right=page+delta+1, prev=null;
+  for(let i=1;i<=pages;i++){if(i===1||i===pages||(i>=left&&i<right))range.push(i);}
+  let btns='';
+  range.forEach(i=>{
+    if(prev&&i-prev>1) btns+=`<span class="page-btn disabled" style="border:none;background:none;color:var(--muted)">…</span>`;
+    btns+=`<button class="page-btn${i===page?' active':''}" onclick="${fn}(${i})">${i}</button>`;
+    prev=i;
+  });
+  el.innerHTML=`
+    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:space-between;padding:14px 0 4px">
+      <span style="font-size:.78rem;color:var(--muted)">Showing <strong style="color:var(--text)">${start}–${end}</strong> of <strong style="color:var(--text)">${total}</strong></span>
+      <div style="display:flex;align-items:center;gap:4px">
+        <button class="page-btn${page===1?' disabled':''}" onclick="${fn}(${page-1})" ${page===1?'disabled':''} title="Prev"><i class="fas fa-chevron-left" style="font-size:.6rem"></i></button>
+        ${btns}
+        <button class="page-btn${page===pages?' disabled':''}" onclick="${fn}(${page+1})" ${page===pages?'disabled':''} title="Next"><i class="fas fa-chevron-right" style="font-size:.6rem"></i></button>
+      </div>
+    </div>`;
+}
+// FIX 7: Smart notifications — suppress low-priority info toasts
+const _origToast = showToast;
+window.showToast = function(msg, type='info') {
+  if(type==='info') {
+    const lm=(msg||'').toLowerCase();
+    if(!(lm.includes('error')||lm.includes('fail')||lm.includes('warning')||lm.includes('stock')||lm.includes('alert')||lm.includes('critical'))) return;
+  }
+  _origToast(msg, type);
+};
+</script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

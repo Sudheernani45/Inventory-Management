@@ -1,0 +1,622 @@
+{% extends "manager/base.html" %}
+{% block title %}Logistics Tracking{% endblock %}
+{% block page_title %}<i class="fas fa-truck-fast" style="color:var(--accent);margin-right:8px"></i>Logistics Tracking{% endblock %}
+
+{% block content %}
+<style>
+.pipeline-track{display:flex;align-items:center;gap:0;margin:16px 0 8px}
+.pipe-step{display:flex;flex-direction:column;align-items:center;gap:6px;flex:1;position:relative}
+.pipe-dot{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.75rem;border:2.5px solid transparent;transition:all .2s;cursor:default}
+.pipe-dot.done{background:var(--accent);color:#fff;border-color:var(--accent)}
+.pipe-dot.active{background:#fff;color:var(--accent);border-color:var(--accent);box-shadow:0 0 0 4px rgba(14,107,63,.15)}
+.pipe-dot.idle{background:var(--surface3);color:var(--muted2);border-color:var(--border-md)}
+.pipe-dot.cancel{background:rgba(239,68,68,.1);color:#ef4444;border-color:rgba(239,68,68,.3)}
+.pipe-dot.delayed{background:rgba(245,158,11,.1);color:#f59e0b;border-color:rgba(245,158,11,.3)}
+.pipe-label{font-size:.6rem;font-weight:600;color:var(--muted);text-align:center;white-space:nowrap}
+.pipe-label.active-lbl{color:var(--accent);font-weight:700}
+.pipe-line{flex:1;height:2px;background:var(--border-md);margin-bottom:18px;transition:background .2s}
+.pipe-line.done{background:var(--accent)}
+.stat-card-row{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px}
+@media(max-width:700px){.stat-card-row{grid-template-columns:1fr 1fr}}
+.stat-pill-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px}
+.stat-pill{display:inline-flex;align-items:center;gap:7px;padding:7px 14px;border-radius:20px;font-size:.78rem;font-weight:600;cursor:pointer;border:2px solid transparent;transition:all .18s;user-select:none}
+.stat-pill.dispatched{background:rgba(59,130,246,.1);color:#3b82f6;border-color:rgba(59,130,246,.25)}
+.stat-pill.in-transit{background:rgba(245,158,11,.1);color:#f59e0b;border-color:rgba(245,158,11,.25)}
+.stat-pill.delivered{background:rgba(34,197,94,.1);color:#22c55e;border-color:rgba(34,197,94,.25)}
+.stat-pill.cancelled{background:rgba(239,68,68,.1);color:#ef4444;border-color:rgba(239,68,68,.25)}
+.stat-pill.active-pill,.stat-pill:hover{box-shadow:0 0 0 2px currentColor}
+.transport-chip{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:16px;font-size:.7rem;font-weight:700;white-space:nowrap}
+.t-Air{background:rgba(59,130,246,.12);color:#3b82f6}
+.t-Road,.t-Truck{background:rgba(245,158,11,.12);color:#f59e0b}
+.t-Rail,.t-Train{background:rgba(168,85,247,.12);color:#a855f7}
+.t-Ship,.t-Sea{background:rgba(6,182,212,.12);color:#06b6d4}
+/* Status modal new grid style */
+.status-card-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px}
+.status-card{padding:12px 14px;border-radius:12px;border:2px solid var(--border-md);cursor:pointer;display:flex;align-items:center;gap:10px;transition:all .18s;background:var(--surface2)}
+.status-card:hover{border-color:#999;transform:translateY(-1px)}
+.status-card.selected{transform:translateY(-1px)}
+.status-card .sc-icon{width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:.8rem;flex-shrink:0}
+.hint-box{margin-top:12px;padding:11px 14px;border-radius:10px;font-size:.77rem;line-height:1.6;display:none}
+.hint-box.show{display:block}
+</style>
+
+<!-- Stat Pills (like image: Dispatched / In Transit / Delivered / Cancelled counts) -->
+<div id="statPillRow" class="stat-pill-row">
+  <div class="stat-pill dispatched" onclick="filterByStatus('Dispatched')">
+    <i class="fas fa-box-open"></i> Dispatched: <strong id="cntDispatched">—</strong>
+  </div>
+  <div class="stat-pill in-transit" onclick="filterByStatus('In Transit')">
+    <i class="fas fa-truck-moving"></i> In Transit: <strong id="cntTransit">—</strong>
+  </div>
+  <div class="stat-pill delivered" onclick="filterByStatus('Delivered')">
+    <i class="fas fa-circle-check"></i> Delivered: <strong id="cntDelivered">—</strong>
+  </div>
+  <div class="stat-pill cancelled" onclick="filterByStatus('Cancelled')">
+    <i class="fas fa-ban"></i> Cancelled: <strong id="cntCancelled">—</strong>
+  </div>
+  <div class="stat-pill" style="background:var(--surface2);color:var(--muted);border-color:var(--border-md)" onclick="filterByStatus('')">
+    <i class="fas fa-list"></i> All Statuses
+  </div>
+</div>
+
+<!-- Main Card -->
+<div class="card">
+  <div class="card-header" style="flex-wrap:wrap;gap:12px">
+    <div style="display:flex;align-items:center;gap:10px">
+      <div class="card-title"><i class="fas fa-route" style="color:var(--accent)"></i>Site Shipments</div>
+      <span id="shipCount" class="badge badge-blue">—</span>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <div class="search-box">
+        <i class="fas fa-search"></i>
+        <input type="text" id="shipSearch" class="form-control" placeholder="Search ID, product, site…" style="width:220px" oninput="debounceShip()"/>
+      </div>
+      <select class="form-control" id="shipStatusFilter" style="width:148px" onchange="loadShipments()">
+        <option value="">All Statuses</option>
+        <option>Dispatched</option><option>Picked Up</option><option>In Transit</option>
+        <option>Out for Delivery</option><option>Delivered</option><option>Delayed</option><option>Cancelled</option>
+      </select>
+      <select class="form-control" id="shipTypeFilter" style="width:138px" onchange="loadShipments()">
+        <option value="">All Transport</option>
+        <option value="Air">✈ Air</option>
+        <option value="Road">🚛 Road</option>
+        <option value="Rail">🚂 Rail</option>
+        <option value="Sea">🚢 Sea</option>
+        <option value="Truck">🚚 Truck</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Show N entries + count row like image -->
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0 6px;font-size:.78rem;color:var(--muted)">
+    <div style="display:flex;align-items:center;gap:8px">
+      Show
+      <select class="form-control" id="perPageSelect" style="width:70px;padding:4px 8px;font-size:.78rem" onchange="loadShipments()">
+        <option value="25" selected>25</option><option value="50">50</option><option value="100">100</option>
+      </select>
+      entries
+    </div>
+    <div class="search-box" style="display:none"><input type="text" id="shipSearch2" style="display:none"/></div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:40px">#</th>
+          <th>Shipment ID</th>
+          <th>Site / Warehouse</th>
+          <th>Product</th>
+          <th>Ship Date</th>
+          <th>Est. Delivery</th>
+          <th>Qty</th>
+          <th>Status</th>
+          <th>Transport</th>
+          <th style="text-align:right">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="shipTbody">
+        {% for i in range(5) %}
+        <tr class="skeleton-row"><td colspan="10"><div class="skeleton" style="height:14px;width:100%"></div></td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div id="shipPagination" style="padding:12px 0 0"></div>
+</div>
+
+<!-- ═══ VIEW DETAIL MODAL ═══ -->
+<div class="modal-overlay" id="viewShipModal">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-header">
+      <div class="modal-title"><i class="fas fa-file-alt" style="color:var(--accent)"></i>Shipment Details</div>
+      <span class="modal-close" onclick="closeModal('viewShipModal')"><i class="fas fa-times"></i></span>
+    </div>
+    <div class="modal-body" id="viewShipBody"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('viewShipModal')">Close</button>
+      <button class="btn btn-primary" id="viewShipTrackBtn"><i class="fas fa-satellite-dish"></i> Track GPS</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ UPDATE TRACKING STATUS MODAL (redesigned like Image 4) ═══ -->
+<div id="statusModalOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:3000;align-items:center;justify-content:center;backdrop-filter:blur(5px)">
+  <div style="background:var(--surface);border-radius:22px;width:100%;max-width:540px;margin:16px;box-shadow:0 40px 120px rgba(0,0,0,.35);overflow:hidden">
+    <!-- Header -->
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:22px 26px;border-bottom:1px solid var(--border)">
+      <div style="display:flex;align-items:center;gap:14px">
+        <div style="width:44px;height:44px;border-radius:13px;background:var(--accent-dim);display:flex;align-items:center;justify-content:center;color:var(--accent);font-size:1rem"><i class="fas fa-truck-fast"></i></div>
+        <div>
+          <div style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:1rem;color:var(--text)">Update Tracking Status</div>
+          <div style="font-size:.72rem;color:var(--muted);margin-top:1px" id="statusModalShipId">—</div>
+        </div>
+      </div>
+      <button onclick="closeStatusModal()" style="background:var(--surface2);border:1px solid var(--border);border-radius:50%;width:36px;height:36px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--muted)"><i class="fas fa-times"></i></button>
+    </div>
+
+    <!-- Body -->
+    <div style="padding:24px 26px;display:flex;flex-direction:column;gap:20px">
+      <!-- Shipment chip -->
+      <div style="background:var(--surface2);border-radius:11px;padding:12px 16px;border:1px solid var(--border)">
+        <div style="font-size:.66rem;color:var(--muted2);text-transform:uppercase;letter-spacing:.08em;margin-bottom:3px">Shipment</div>
+        <div id="statusModalShipChip" style="font-family:monospace;font-weight:700;font-size:.98rem;color:var(--accent)">—</div>
+      </div>
+
+      <!-- Pipeline visualization (like Image 4) -->
+      <div>
+        <div style="font-size:.78rem;font-weight:700;color:var(--text);margin-bottom:14px">Delivery Pipeline</div>
+        <div id="pipelineSteps" class="pipeline-track"></div>
+      </div>
+      
+
+      <!-- New Status label -->
+      <div>
+        <label style="display:block;font-size:.78rem;font-weight:700;color:var(--text);margin-bottom:10px">New Status</label>
+        <div id="statusOptionGrid" class="status-card-grid"></div>
+        <div id="statusDecisionHelper" class="hint-box"></div>
+      </div>
+
+      <!-- Footer buttons -->
+      <div style="display:flex;gap:10px;justify-content:flex-end;padding-top:4px;border-top:1px solid var(--border)">
+        <button onclick="closeStatusModal()" style="padding:10px 22px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;cursor:pointer;font-size:.83rem;font-weight:500;color:var(--text)">Cancel</button>
+        <button id="saveStatusBtn" onclick="saveStatus()" style="padding:10px 22px;background:var(--accent);color:#fff;border:none;border-radius:10px;cursor:pointer;font-size:.83rem;font-weight:700;display:flex;align-items:center;gap:7px"><i class="fas fa-floppy-disk"></i> Save &amp; Update</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- GPS Tracking Modal -->
+<div id="trackingOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:2000;align-items:center;justify-content:center;backdrop-filter:blur(6px)">
+  <div style="background:var(--surface);border-radius:22px;width:100%;max-width:920px;margin:16px;box-shadow:0 40px 120px rgba(0,0,0,.38);overflow:hidden;max-height:96vh;display:flex;flex-direction:column">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:20px 26px;border-bottom:1px solid var(--border);flex-shrink:0">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div id="trackTypeIcon" style="width:44px;height:44px;border-radius:12px;background:var(--accent-dim);display:flex;align-items:center;justify-content:center;font-size:1.3rem">🚛</div>
+        <div>
+          <div style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:1rem;color:var(--text)" id="trackTitle">Live Shipment Tracking</div>
+          <div style="font-size:.72rem;color:var(--muted)" id="trackSubtitle">OpenStreetMap Route</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <span id="trackStatusBadge" class="badge badge-blue">—</span>
+        <button onclick="closeTracking()" style="background:var(--surface2);border:1px solid var(--border);border-radius:50%;width:36px;height:36px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--muted)"><i class="fas fa-times"></i></button>
+      </div>
+    </div>
+    <div style="display:flex;flex:1;overflow:hidden;min-height:0">
+      <div style="width:290px;flex-shrink:0;overflow-y:auto;border-right:1px solid var(--border);padding:18px;display:flex;flex-direction:column;gap:12px">
+        <div style="background:var(--surface2);border-radius:10px;padding:11px 14px;border:1px solid var(--border)">
+          <div style="font-size:.65rem;color:var(--muted2);text-transform:uppercase;letter-spacing:.08em;margin-bottom:3px">Shipment ID</div>
+          <div id="trackShipId" style="font-family:monospace;font-weight:700;font-size:.9rem;color:var(--accent)">—</div>
+        </div>
+        <div style="background:var(--surface2);border-radius:10px;padding:11px 14px;border:1px solid var(--border)">
+          <div style="font-size:.65rem;color:var(--muted2);text-transform:uppercase;letter-spacing:.08em;margin-bottom:3px">Product</div>
+          <div id="trackProduct" style="font-weight:600;font-size:.86rem">—</div>
+          <div id="trackQty" style="font-size:.76rem;color:var(--muted);margin-top:2px">Qty: —</div>
+        </div>
+        <div style="background:var(--surface2);border-radius:10px;padding:11px 14px;border:1px solid var(--border)">
+          <div style="font-size:.65rem;color:var(--muted2);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Route</div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <div style="display:flex;align-items:center;gap:8px"><div style="width:8px;height:8px;border-radius:50%;background:var(--accent);flex-shrink:0"></div><span id="trackOrigin" style="font-size:.8rem">—</span></div>
+            <div style="margin-left:3px;width:2px;height:14px;background:var(--border-md)"></div>
+            <div style="display:flex;align-items:center;gap:8px"><div style="width:8px;height:8px;border-radius:50%;background:#ef4444;flex-shrink:0"></div><span id="trackDest" style="font-size:.8rem">—</span></div>
+          </div>
+        </div>
+        <div style="background:var(--surface2);border-radius:10px;padding:11px 14px;border:1px solid var(--border)">
+          <div style="font-size:.65rem;color:var(--muted2);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Transport Mode</div>
+          <div style="display:flex;align-items:center;gap:8px"><span id="trackTypeEmoji" style="font-size:1.1rem">🚛</span><span id="trackTypeName" style="font-weight:600;font-size:.86rem">—</span></div>
+        </div>
+        <div style="background:var(--surface2);border-radius:10px;padding:11px 14px;border:1px solid var(--border)">
+          <div style="font-size:.65rem;color:var(--muted2);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">Timeline</div>
+          <div id="trackTimeline"></div>
+        </div>
+        <a id="trackGmapsBtn" href="#" target="_blank" style="display:flex;align-items:center;justify-content:center;gap:8px;padding:11px;border-radius:10px;background:linear-gradient(135deg,#4285F4,#34A853);color:#fff;text-decoration:none;font-weight:700;font-size:.8rem">
+          <i class="fab fa-google"></i> Open in Google Maps
+        </a>
+      </div>
+      <div style="flex:1;position:relative;min-height:440px">
+        <div id="trackMapDiv" style="position:absolute;inset:0;width:100%;height:100%"></div>
+        <div style="position:absolute;bottom:14px;right:14px;background:var(--surface);border-radius:12px;padding:12px 16px;box-shadow:0 6px 24px rgba(0,0,0,.15);z-index:10">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+            <div style="width:7px;height:7px;border-radius:50%;background:#22c55e;animation:pulse 2s infinite"></div>
+            <div style="font-size:.66rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em">Live</div>
+          </div>
+          <div id="trackMapShipId" style="font-family:monospace;color:var(--accent);font-weight:700;font-size:.86rem">—</div>
+          <div id="trackMapType" style="font-size:.72rem;color:var(--muted);margin-top:1px">—</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(1.5)}}</style>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+const ROLE = 'manager';
+const TICONS = {Air:'✈️',Road:'🚛',Truck:'🚛',Rail:'🚂',Train:'🚂',Sea:'🚢',Ship:'🚢'};
+const CITY_COORDS = {
+  'Hyderabad':{lat:17.385,lng:78.486},'Bangalore':{lat:12.971,lng:77.594},
+  'Chennai':{lat:13.082,lng:80.270},'Mumbai':{lat:19.075,lng:72.877},
+  'Delhi':{lat:28.704,lng:77.102},'Kolkata':{lat:22.572,lng:88.363},
+  'Kurnool':{lat:15.828,lng:78.037},'Pune':{lat:18.516,lng:73.856},
+  'Ahmedabad':{lat:23.022,lng:72.571},'Jaipur':{lat:26.912,lng:75.787},
+  'Lucknow':{lat:26.846,lng:80.946},'Visakhapatnam':{lat:17.686,lng:83.218}
+};
+
+const PIPELINE_STEPS = [
+  {key:'In Transit',icon:'fa-truck-fast',label:'In Transit'},
+  {key:'Out for Delivery',icon:'fa-house',label:'Out for Delivery'},
+  {key:'Delivered',icon:'fa-circle-check',label:'Delivered'},
+  {key:'Delayed',icon:'fa-clock',label:'Delayed'},
+  {key:'Cancelled',icon:'fa-ban',label:'Cancelled'},
+];
+const SELECTABLE = [
+  {key:'Out for Delivery',icon:'fa-house',label:'Out for Delivery',color:'#f59e0b'},
+  {key:'Delivered',icon:'fa-circle-check',label:'Delivered',color:'#22c55e'},
+  {key:'Delayed',icon:'fa-clock',label:'Delayed',color:'#f97316'},
+  {key:'Cancelled',icon:'fa-ban',label:'Cancelled',color:'#ef4444'},
+];
+const HINTS = {
+  Delivered:{bg:'rgba(34,197,94,.1)',color:'#22c55e',icon:'fa-circle-check',text:'<strong>Mark as Delivered</strong><br>• Customer confirmed receipt<br>• Proof of delivery obtained<br>• Package at destination'},
+  Cancelled:{bg:'rgba(239,68,68,.1)',color:'#ef4444',icon:'fa-ban',text:'<strong>Mark as Cancelled</strong><br>• Order withdrawn by customer<br>• Shipment returned before dispatch<br>• Stock could not be fulfilled'},
+  Delayed:{bg:'rgba(249,115,22,.1)',color:'#f97316',icon:'fa-clock',text:'<strong>Mark as Delayed</strong><br>• Shipment missed delivery date<br>• Logistical/customs hold<br>• Weather or force-majeure'},
+  'Out for Delivery':{bg:'rgba(245,158,11,.1)',color:'#f59e0b',icon:'fa-house',text:'<strong>Mark as Out for Delivery</strong><br>• Shipment with local carrier<br>• Final delivery in progress<br>• Customer notification sent'},
+};
+
+let shipRecords=[], shipTimer=null, currentPage=1;
+let _statusIdx=-1, _selectedStatus='';
+let _leafletMap=null, _leafletLayers=[];
+
+function debounceShip(){ clearTimeout(shipTimer); shipTimer=setTimeout(()=>loadShipments(1),300); }
+
+function statusBadgeClass(s){
+  const m={Delivered:'badge-green','In Transit':'badge-blue',Dispatched:'badge-blue',
+    'Out for Delivery':'badge-yellow','Picked Up':'badge-blue',
+    Delayed:'badge-red',Cancelled:'badge-gray',Pending:'badge-yellow'};
+  return m[s]||'badge-gray';
+}
+
+async function loadShipmentStats(){
+  try{
+    const {ok,data} = await apiFetch('/manager/api/shipments/stats');
+    if(!ok) return;
+    document.getElementById('cntDispatched').textContent = ((data.dispatched||0)+(data.picked_up||0)+(data.out_for_delivery||0)).toLocaleString();
+    document.getElementById('cntTransit').textContent = (data.in_transit||0).toLocaleString();
+    document.getElementById('cntDelivered').textContent = (data.delivered||0).toLocaleString();
+    document.getElementById('cntCancelled').textContent = (data.cancelled||0).toLocaleString();
+  }catch(e){}
+}
+
+function filterByStatus(s){
+  document.getElementById('shipStatusFilter').value = s;
+  document.querySelectorAll('.stat-pill').forEach(el=>el.classList.remove('active-pill'));
+  loadShipments();
+}
+
+async function loadShipments(page=1){
+  currentPage=page;
+  const status = document.getElementById('shipStatusFilter').value;
+  const q      = document.getElementById('shipSearch').value.trim();
+  const ttype  = document.getElementById('shipTypeFilter').value;
+  const pp     = document.getElementById('perPageSelect').value;
+  const tbody  = document.getElementById('shipTbody');
+  tbody.innerHTML = Array(5).fill(`<tr>${Array(10).fill('<td><div class="skeleton" style="height:12px;width:85%"></div></td>').join('')}</tr>`).join('');
+  try{
+    const {ok,data} = await apiFetch(`/manager/api/shipments/list?page=${page}&status=${encodeURIComponent(status)}&q=${encodeURIComponent(q)}&ttype=${encodeURIComponent(ttype)}&per_page=${pp}`);
+    if(!ok) return;
+    shipRecords = data.records||[];
+    document.getElementById('shipCount').textContent = (data.total||0).toLocaleString();
+    renderShipTable(shipRecords, page, parseInt(pp));
+    renderPag('shipPagination', page, data.total, parseInt(pp), 'loadShipments');
+    loadShipmentStats();
+  }catch(e){ showToast && showToast('Error loading shipments','error'); }
+}
+
+function renderShipTable(records, page, pp){
+  const tbody = document.getElementById('shipTbody');
+  if(!records.length){
+    tbody.innerHTML='<tr><td colspan="10"><div class="empty-state"><i class="fas fa-truck-fast"></i><p>No shipments found</p></div></td></tr>';
+    return;
+  }
+  tbody.innerHTML = records.map((r,i)=>{
+    const n = (page-1)*pp+i+1;
+    const carrier = r.transportation_type||r.carrier||'—';
+    const icon = TICONS[carrier]||'📦';
+    const status = r.delivery_status||'Pending';
+    const canEdit = !['Delivered','Cancelled'].includes(status);
+    const tClass = `t-${carrier}`;
+    return `<tr>
+      <td style="color:var(--muted2);font-size:.75rem;font-weight:600">${n}</td>
+      <td><a href="#" onclick="viewShipment(${i});return false" style="font-family:monospace;font-size:.78rem;color:var(--accent);font-weight:700;text-decoration:none">${r.shipment_id||'—'}</a></td>
+      <td><span style="background:var(--surface2);padding:2px 8px;border-radius:6px;font-size:.76rem;font-weight:600;color:var(--text)">${r.site_id||r.site_name||'—'}</span></td>
+      <td style="font-size:.8rem;font-weight:500;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.product_name||r.product_id||'—'}</td>
+      <td style="font-size:.78rem;color:var(--muted)">${r.shipment_date||'—'}</td>
+      <td style="font-size:.78rem;color:var(--muted)">${r.delivery_date||r.est_delivery||'—'}</td>
+      <td style="font-weight:700">${Number(r.quantity||0).toLocaleString()}</td>
+      <td><span class="badge ${statusBadgeClass(status)}">${status}</span></td>
+      <td><span class="transport-chip ${tClass}">${icon} ${carrier}</span></td>
+      <td>
+        <div style="display:flex;gap:5px;justify-content:flex-end">
+          <button class="btn btn-ghost btn-sm btn-icon" onclick="viewShipment(${i})" title="View"><i class="fas fa-eye" style="color:var(--accent)"></i></button>
+          <button class="btn btn-ghost btn-sm btn-icon" onclick="openTracking(${i})" title="Track"><i class="fas fa-location-dot" style="color:#3b82f6"></i></button>
+          ${canEdit
+            ? `<button onclick="openStatusModal(${i})" style="padding:4px 10px;font-size:.71rem;font-weight:600;background:var(--accent-dim);color:var(--accent);border:1px solid rgba(14,107,63,.25);border-radius:7px;cursor:pointer"><i class="fas fa-pen-to-square"></i> Status</button>`
+            : `<span style="padding:4px 9px;font-size:.71rem;background:var(--surface2);color:var(--muted2);border:1px solid var(--border);border-radius:7px;display:inline-flex;align-items:center;gap:3px"><i class="fas fa-lock"></i> ${status}</span>`
+          }
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+/* ── View Detail ── */
+function viewShipment(i){
+  const r=shipRecords[i]; if(!r) return;
+  const carrier=r.transportation_type||r.carrier||'—';
+  const icon=TICONS[carrier]||'📦';
+  const status=r.delivery_status||'Pending';
+  document.getElementById('viewShipBody').innerHTML=`
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div style="background:linear-gradient(135deg,#1b3a6b,#1a5ea8);border-radius:14px;padding:18px 20px;color:#fff">
+        <div style="display:flex;align-items:center;gap:12px">
+          <div style="width:46px;height:46px;border-radius:12px;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-size:1.5rem">${icon}</div>
+          <div style="flex:1">
+            <div style="font-size:.65rem;opacity:.7;text-transform:uppercase;letter-spacing:.09em">Shipment ID</div>
+            <div style="font-family:monospace;font-size:.98rem;font-weight:800">${r.shipment_id||'—'}</div>
+          </div>
+          <span class="badge ${statusBadgeClass(status)}" style="background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.3)">${status}</span>
+        </div>
+        <div style="margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,.15);display:flex;justify-content:space-between">
+          <span style="opacity:.75;font-size:.78rem">${carrier} transport</span>
+          <span style="opacity:.75;font-size:.78rem">${r.shipment_date||'—'}</span>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="view-field" style="grid-column:1/-1"><div class="view-label">Product</div><div class="view-value">${r.product_name||r.product_id||'—'}</div></div>
+        <div class="view-field"><div class="view-label">Site / Warehouse</div><div class="view-value">${r.site_name||r.site_id||'—'}</div></div>
+        <div class="view-field"><div class="view-label">Quantity</div><div class="view-value highlight">${Number(r.quantity||0).toLocaleString()} units</div></div>
+        <div class="view-field"><div class="view-label">Ship Date</div><div class="view-value">${r.shipment_date||'—'}</div></div>
+        <div class="view-field"><div class="view-label">Est. Delivery</div><div class="view-value">${r.delivery_date||r.est_delivery||'Pending'}</div></div>
+      </div>
+    </div>`;
+  document.getElementById('viewShipTrackBtn').onclick=()=>{ closeModal('viewShipModal'); openTracking(i); };
+  openModal('viewShipModal');
+}
+
+/* ── GPS Tracking ── */
+function extractCity(s){ for(const c of Object.keys(CITY_COORDS)) if((s||'').toLowerCase().includes(c.toLowerCase())) return c; return null; }
+function guessOrigin(s){ const dest=extractCity(s)||'Hyderabad'; const others=Object.keys(CITY_COORDS).filter(c=>c!==dest); return others[Math.floor(Math.random()*others.length)]||'Mumbai'; }
+
+function openTracking(i){
+  const r=shipRecords[i]; if(!r) return;
+  const carrier=r.transportation_type||r.carrier||'Truck';
+  const icon=TICONS[carrier]||'📦';
+  const shipId=r.shipment_id||('SHP-'+i);
+  const status=r.delivery_status||'Pending';
+  const siteName=r.site_name||r.site_id||'';
+  const originCity=guessOrigin(siteName), destCity=extractCity(siteName)||'Hyderabad';
+  const oCoord=CITY_COORDS[originCity]||CITY_COORDS['Mumbai'];
+  const dCoord=CITY_COORDS[destCity]||CITY_COORDS['Hyderabad'];
+
+  document.getElementById('trackTitle').textContent=`Tracking: ${shipId}`;
+  document.getElementById('trackSubtitle').textContent=`${icon} ${carrier} · ${r.product_name||r.product_id||'—'}`;
+  document.getElementById('trackTypeIcon').textContent=icon;
+  document.getElementById('trackShipId').textContent=shipId;
+  document.getElementById('trackMapShipId').textContent=shipId;
+  document.getElementById('trackMapType').textContent=`Via ${carrier}`;
+  document.getElementById('trackProduct').textContent=r.product_name||r.product_id||'—';
+  document.getElementById('trackQty').textContent=`Qty: ${r.quantity||0} units`;
+  document.getElementById('trackTypeName').textContent=carrier;
+  document.getElementById('trackTypeEmoji').textContent=icon;
+  document.getElementById('trackOrigin').textContent=`Origin: ${originCity}`;
+  document.getElementById('trackDest').textContent=`Dest: ${destCity}`;
+  const sc=statusBadgeClass(status);
+  document.getElementById('trackStatusBadge').className=`badge ${sc}`;
+  document.getElementById('trackStatusBadge').textContent=status;
+  document.getElementById('trackTimeline').innerHTML=buildTimeline(carrier,r.shipment_date,status);
+  const gmapsUrl=`https://www.google.com/maps/dir/${encodeURIComponent(originCity+',India')}/${encodeURIComponent(destCity+',India')}`;
+  document.getElementById('trackGmapsBtn').href=gmapsUrl;
+  document.getElementById('trackingOverlay').style.display='flex';
+  setTimeout(()=>initLeafletMap(oCoord,dCoord,originCity,destCity,carrier),140);
+}
+
+function initLeafletMap(oC,dC,oCity,dCity,carrier){
+  if(!_leafletMap){
+    _leafletMap=L.map('trackMapDiv',{zoomControl:true,attributionControl:true});
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap',maxZoom:18}).addTo(_leafletMap);
+  }
+  _leafletLayers.forEach(l=>_leafletMap.removeLayer(l)); _leafletLayers=[];
+  const gDot=L.divIcon({className:'',html:'<div style="width:13px;height:13px;background:#22c55e;border:2.5px solid #fff;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,.3)"></div>',iconSize:[13,13],iconAnchor:[6,6]});
+  const rDot=L.divIcon({className:'',html:'<div style="width:13px;height:13px;background:#ef4444;border:2.5px solid #fff;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,.3)"></div>',iconSize:[13,13],iconAnchor:[6,6]});
+  const icon=TICONS[carrier]||'📦';
+  const midLat=oC.lat*.45+dC.lat*.55, midLng=oC.lng*.45+dC.lng*.55;
+  const tIcon=L.divIcon({className:'',html:`<div style="background:var(--accent);color:#fff;padding:4px 9px;border-radius:8px;font-size:.68rem;font-weight:700;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.2)">${icon} In Route</div>`,iconSize:[90,26],iconAnchor:[45,13]});
+  const m1=L.marker([oC.lat,oC.lng],{icon:gDot}).bindPopup(`<b>Origin</b><br>${oCity}`).addTo(_leafletMap);
+  const m2=L.marker([dC.lat,dC.lng],{icon:rDot}).bindPopup(`<b>Destination</b><br>${dCity}`).addTo(_leafletMap);
+  const m3=L.marker([midLat,midLng],{icon:tIcon}).addTo(_leafletMap);
+  const line=L.polyline([[oC.lat,oC.lng],[midLat,midLng],[dC.lat,dC.lng]],{color:'#0e6b3f',weight:3,dashArray:'8,6',opacity:.88}).addTo(_leafletMap);
+  _leafletLayers=[m1,m2,m3,line];
+  _leafletMap.fitBounds([[oC.lat,oC.lng],[dC.lat,dC.lng]],{padding:[40,40]});
+  _leafletMap.invalidateSize();
+}
+
+function closeTracking(){ document.getElementById('trackingOverlay').style.display='none'; }
+document.addEventListener('DOMContentLoaded',()=>{
+  const o=document.getElementById('trackingOverlay');
+  if(o) o.addEventListener('click',e=>{if(e.target===o)closeTracking();});
+});
+
+function buildTimeline(carrier,date,status){
+  const steps=[
+    {label:'Order Placed',done:true,icon:'fas fa-file-invoice'},
+    {label:'Dispatched',done:['In Transit','Out for Delivery','Delivered'].includes(status),icon:'fas fa-box-open'},
+    {label:'In Transit',done:['Out for Delivery','Delivered'].includes(status),icon:`fas fa-${carrier==='Air'?'plane':carrier==='Sea'||carrier==='Ship'?'ship':carrier==='Rail'||carrier==='Train'?'train':'truck'}`},
+    {label:'Delivered',done:status==='Delivered',icon:'fas fa-circle-check'},
+  ];
+  return steps.map(s=>`<div style="display:flex;align-items:flex-start;gap:9px;margin-bottom:10px">
+    <div style="width:26px;height:26px;border-radius:50%;background:${s.done?'var(--accent)':'var(--surface3)'};display:flex;align-items:center;justify-content:center;flex-shrink:0">
+      <i class="${s.icon}" style="font-size:.6rem;color:${s.done?'#fff':'var(--muted)'}"></i>
+    </div>
+    <div><div style="font-size:.76rem;font-weight:${s.done?'600':'400'};color:${s.done?'var(--text)':'var(--muted)'}">${s.label}</div>${s.done&&date?`<div style="font-size:.66rem;color:var(--muted);margin-top:1px">${date}</div>`:''}</div>
+  </div>`).join('');
+}
+
+/* ── Update Status Modal ── */
+function openStatusModal(i){
+  _statusIdx=i; _selectedStatus='';
+  const r=shipRecords[i]; if(!r) return;
+  const status=r.delivery_status||'Pending';
+  const shipId=r.shipment_id||`SHP-${i}`;
+  document.getElementById('statusModalShipId').textContent=shipId;
+  document.getElementById('statusModalShipChip').textContent=shipId;
+  renderPipeline(status);
+  renderStatusCards();
+  document.getElementById('statusDecisionHelper').className='hint-box';
+  document.getElementById('statusModalOverlay').style.display='flex';
+}
+function closeStatusModal(){
+  document.getElementById('statusModalOverlay').style.display='none';
+  _statusIdx=-1; _selectedStatus='';
+}
+document.addEventListener('DOMContentLoaded',()=>{
+  const o=document.getElementById('statusModalOverlay');
+  if(o) o.addEventListener('click',e=>{if(e.target===o)closeStatusModal();});
+});
+
+function renderPipeline(currentStatus){
+  // Map early statuses to In Transit for pipeline display
+  if (['Dispatched', 'Picked Up'].includes(currentStatus)) {
+    currentStatus = 'In Transit';
+  }
+  const order=['In Transit','Out for Delivery','Delivered','Delayed','Cancelled'];
+  const curIdx=order.indexOf(currentStatus);
+  const container=document.getElementById('pipelineSteps');
+  container.innerHTML=PIPELINE_STEPS.map((s,i)=>{
+    const isCurrent=s.key===currentStatus;
+    const isDone=curIdx>=i;
+    let cls=isCurrent?'active':(isDone?'done':'idle');
+    if (s.key === 'Cancelled' && (isCurrent || isDone)) cls = 'cancel';
+    if (s.key === 'Delayed' && (isCurrent || isDone)) cls = 'delayed';
+    const lbl=isCurrent?'active-lbl':'';
+    const lineD=(isDone&&i<PIPELINE_STEPS.length-1)?'done':'';
+    return `<div class="pipe-step">
+      <div class="pipe-dot ${cls}"><i class="fas ${s.icon}"></i></div>
+      <div class="pipe-label ${lbl}">${s.label}</div>
+    </div>${i<PIPELINE_STEPS.length-1?`<div class="pipe-line ${lineD}"></div>`:''}`
+  }).join('');
+}
+
+function renderStatusCards(){
+  document.getElementById('statusOptionGrid').innerHTML=SELECTABLE.map(s=>`
+    <div id="sc-${s.key.replace(/\s/g,'-')}" class="status-card" onclick="selectStatus('${s.key}')">
+      <div class="sc-icon" style="background:${s.color}20"><i class="fas ${s.icon}" style="color:${s.color}"></i></div>
+      <span style="font-size:.83rem;font-weight:600;color:var(--text)">${s.label}</span>
+    </div>`).join('');
+}
+
+function selectStatus(s){
+  _selectedStatus=s;
+  SELECTABLE.forEach(x=>{
+    const el=document.getElementById('sc-'+x.key.replace(/\s/g,'-'));
+    if(!el) return;
+    if(x.key===s){
+      el.style.borderColor=x.color;
+      el.style.background=x.color+'20';
+      el.style.boxShadow='0 0 0 3px '+x.color+'30';
+      el.classList.add('selected');
+    } else {
+      el.style.borderColor='var(--border-md)';
+      el.style.background='var(--surface2)';
+      el.style.boxShadow='none';
+      el.classList.remove('selected');
+    }
+  });
+  renderPipeline(s);
+  const hint=HINTS[s];
+  const hb=document.getElementById('statusDecisionHelper');
+  if(hint){
+    hb.className='hint-box show';
+    hb.style.cssText=`display:block;margin-top:10px;padding:11px 14px;border-radius:10px;font-size:.77rem;line-height:1.7;background:${hint.bg};color:${hint.color};border:1px solid ${hint.color}44`;
+    hb.innerHTML=`<i class="fas ${hint.icon}" style="margin-right:6px"></i>${hint.text}`;
+  } else {
+    hb.className='hint-box';
+  }
+}
+
+async function saveStatus(){
+  if(!_selectedStatus){ showToast&&showToast('Please select a status','info'); return; }
+  const r=shipRecords[_statusIdx]; if(!r) return;
+  const shipId=r.shipment_id;
+  const btn=document.getElementById('saveStatusBtn');
+  btn.disabled=true; btn.innerHTML='<span class="spinner" style="width:14px;height:14px;margin-right:6px"></span>Saving…';
+  try{
+    const res=await apiFetch(`/manager/api/shipments/${shipId}/update-status`,{method:'POST',body:JSON.stringify({delivery_status:_selectedStatus})});
+    if(res.ok){
+      r.delivery_status=_selectedStatus;
+      showToast&&showToast(`Status updated to ${_selectedStatus}`,'success');
+      closeStatusModal(); loadShipments(currentPage);
+    } else {
+      showToast&&showToast(res.data?.message||'Update failed','error');
+    }
+  } catch(e){ showToast&&showToast('Network error','error'); }
+  finally{ btn.disabled=false; btn.innerHTML='<i class="fas fa-floppy-disk"></i> Save & Update'; }
+}
+
+/* ── Pagination ── */
+function renderPag(elId,page,total,pp,fn){
+  const pages=Math.ceil(total/pp), el=document.getElementById(elId);
+  if(!el) return;
+  const start=(page-1)*pp+1, end=Math.min(page*pp,total);
+  let btns=''; const delta=2;
+  for(let i=1;i<=pages;i++){
+    if(i===1||i===pages||(i>=page-delta&&i<=page+delta)){
+      btns+=`<a class="page-btn${i===page?' active':''}" onclick="${fn}(${i})">${i}</a>`;
+    } else if(btns.slice(-5)!=='…</a>') { btns+='<span class="page-btn" style="border:none;cursor:default;color:var(--muted)">…</span>'; }
+  }
+  el.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:8px 0 2px">
+    <span style="font-size:.78rem;color:var(--muted)">Showing <strong>${start}–${end}</strong> of <strong>${total}</strong></span>
+    <div style="display:flex;align-items:center;gap:4px">
+      <button class="page-btn${page===1?' disabled':''}" onclick="${fn}(${page-1})" ${page===1?'disabled':''}><i class="fas fa-chevron-left" style="font-size:.6rem"></i></button>
+      ${btns}
+      <button class="page-btn${page===pages?' disabled':''}" onclick="${fn}(${page+1})" ${page===pages?'disabled':''}><i class="fas fa-chevron-right" style="font-size:.6rem"></i></button>
+    </div>
+  </div>`;
+}
+
+function openModal(id){ document.getElementById(id).classList.add('open'); }
+function closeModal(id){ document.getElementById(id).classList.remove('open'); }
+
+/* ── Init ── */
+(function(){
+  const params=new URLSearchParams(window.location.search);
+  const ref=params.get('ref'), ttype=params.get('type');
+  if(ref) document.getElementById('shipSearch').value=ref;
+  if(ttype){ const el=document.getElementById('shipTypeFilter'); if(el) el.value=ttype; }
+  loadShipments(1);
+})();
+</script>
+{% endblock %}

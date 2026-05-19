@@ -1,0 +1,61 @@
+{% extends "analyst/base.html" %}
+{% block title %}Promotions{% endblock %}
+{% block page_title %}Promotions{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header" style="flex-wrap:wrap;gap:12px">
+    <div style="display:flex;align-items:center;gap:10px">
+      <div class="card-title"><i class="fas fa-tag" style="color:#6366f1"></i> Promotions & Discounts</div>
+      <span id="promoCount" class="badge badge-blue">—</span>
+    </div>
+    <div style="position:relative">
+      <i class="fas fa-search" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:.8rem"></i>
+      <input type="text" id="promoSearch" class="form-control" placeholder="Search product…" style="padding-left:32px;width:200px" oninput="debounce()"/>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>#</th><th>Product</th><th>Site</th><th>Type</th><th>Discount %</th><th>Start Date</th><th>End Date</th><th>Status</th></tr></thead>
+      <tbody id="promoTbody"><tr><td colspan="8" style="text-align:center;padding:32px"><span class="spinner"></span></td></tr></tbody>
+    </table>
+  </div>
+  <div id="promoPag"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let promoPage=1, promoTimer=null;
+function debounce(){clearTimeout(promoTimer);promoTimer=setTimeout(()=>loadPromos(1),300);}
+
+async function loadPromos(page=1){
+  promoPage=page;
+  const q=document.getElementById('promoSearch').value.trim();
+  const {ok,data}=await apiFetch(`/analyst/api/promotions-data?page=${page}&q=${encodeURIComponent(q)}`);
+  if(!ok)return;
+  document.getElementById('promoCount').textContent=data.total||0;
+  const tbody=document.getElementById('promoTbody');
+  const rows=data.records||[];
+  if(!rows.length){tbody.innerHTML='<tr><td colspan="8"><div class="empty-state"><i class="fas fa-tag"></i><p>No promotions found</p></div></td></tr>';document.getElementById('promoPag').innerHTML='';return;}
+  const today=new Date().toISOString().split('T')[0];
+  tbody.innerHTML=rows.map((r,i)=>{
+    const active=r.start_date&&r.end_date&&r.start_date<=today&&r.end_date>=today;
+    const expired=r.end_date&&r.end_date<today;
+    const status=expired?'<span class="badge badge-red">Expired</span>':active?'<span class="badge badge-green">Active</span>':'<span class="badge badge-yellow">Upcoming</span>';
+    return `<tr>
+      <td style="color:var(--muted)">${(page-1)*20+i+1}</td>
+      <td style="font-weight:500">${r.product||'—'}</td>
+      <td style="color:var(--muted)">${r.site||'All Sites'}</td>
+      <td><span class="badge badge-blue">${r.type||'—'}</span></td>
+      <td style="font-weight:600;color:#6366f1">${Number(r.amount||0).toFixed(1)}%</td>
+      <td style="color:var(--muted)">${r.start_date||'—'}</td>
+      <td style="color:var(--muted)">${r.end_date||'—'}</td>
+      <td>${status}</td>
+    </tr>`;
+  }).join('');
+  renderPag('promoPag',page,data.total,20,'loadPromos');
+}
+loadPromos(1);
+</script>
+{% endblock %}

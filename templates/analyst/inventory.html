@@ -1,0 +1,180 @@
+{% extends "analyst/base.html" %}
+{% block title %}Inventory Analysis{% endblock %}
+{% block page_title %}<i class="fas fa-warehouse" style="color:#6366f1;margin-right:8px"></i>Inventory Analysis{% endblock %}
+{% block content %}
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;flex-wrap:wrap;gap:10px">
+  <p style="color:var(--muted);font-size:.82rem;margin:0">Read-only inventory view across all sites.</p>
+  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+    <select class="form-control" id="siteFilter" onchange="loadInventory()" style="width:180px">
+      <option value="">All Sites</option>
+    </select>
+    <select class="form-control" id="stockoutFilter" onchange="loadInventory()" style="width:160px">
+      <option value="">All Stock</option>
+      <option value="yes">Stockouts Only</option>
+    </select>
+  </div>
+</div>
+
+<!-- Summary Cards -->
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:18px">
+  <div class="card" style="padding:14px 16px;margin:0">
+    <div style="font-size:.68rem;font-weight:700;color:var(--muted2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Stockouts</div>
+    <div id="summaryStockout" style="font-size:1.5rem;font-weight:800;font-family:'Plus Jakarta Sans',sans-serif;color:var(--danger)">—</div>
+  </div>
+  <div class="card" style="padding:14px 16px;margin:0">
+    <div style="font-size:.68rem;font-weight:700;color:var(--muted2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Low Stock</div>
+    <div id="summaryLowStock" style="font-size:1.5rem;font-weight:800;font-family:'Plus Jakarta Sans',sans-serif;color:var(--warn)">—</div>
+  </div>
+  <div class="card" style="padding:14px 16px;margin:0">
+    <div style="font-size:.68rem;font-weight:700;color:var(--muted2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">Total Records</div>
+    <div id="summaryTotal" style="font-size:1.5rem;font-weight:800;font-family:'Plus Jakarta Sans',sans-serif">—</div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <div class="card-title"><i class="fas fa-warehouse" style="color:#6366f1"></i> Inventory Records</div>
+    <div style="position:relative">
+      <i class="fas fa-search" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:.8rem"></i>
+      <input type="text" id="invSearch" class="form-control" placeholder="Search product…" style="padding-left:32px;width:180px" oninput="debounce()"/>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Product</th><th>Site</th><th>Starting Inv.</th><th>Replenishment</th><th>Ending Inv.</th><th>Current Stock</th><th>Status</th><th>View</th></tr></thead>
+      <tbody id="invTbody"><tr><td colspan="8"><div class="empty-state"><span class="spinner"></span></div></td></tr></tbody>
+    </table>
+  </div>
+  <div id="invPager" style="display:flex;justify-content:space-between;align-items:center;padding:12px 0 0;font-size:.78rem;color:var(--muted)"></div>
+</div>
+
+<!-- VIEW MODAL -->
+<div id="invViewModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:2500;align-items:center;justify-content:center;backdrop-filter:blur(4px)" onclick="if(event.target===this)this.style.display='none'">
+  <div style="background:var(--surface);border-radius:18px;width:100%;max-width:480px;margin:16px;max-height:90vh;overflow-y:auto;box-shadow:0 24px 80px rgba(0,0,0,.3)">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 22px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface);z-index:1;border-radius:18px 18px 0 0">
+      <div style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:.95rem;color:var(--text)"><i class="fas fa-warehouse" style="color:#6366f1;margin-right:8px"></i>Inventory Details</div>
+      <button onclick="document.getElementById('invViewModal').style.display='none'" style="background:var(--surface2);border:none;border-radius:50%;width:30px;height:30px;cursor:pointer;color:var(--muted)"><i class="fas fa-times"></i></button>
+    </div>
+    <div style="padding:20px 22px" id="invViewBody"></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let invPage=1,invTimer=null;
+function debounce(){clearTimeout(invTimer);invTimer=setTimeout(()=>loadInventory(1),300);}
+
+async function loadInventory(page=1){
+  invPage=page;
+  const site=document.getElementById('siteFilter').value;
+  const stockout=document.getElementById('stockoutFilter').value;
+  const q=document.getElementById('invSearch').value.trim();
+  let url=`/analyst/api/inventory-data?page=${page}`;
+  if(site)    url+=`&site_id=${encodeURIComponent(site)}`;
+  if(stockout)url+=`&stockout=${encodeURIComponent(stockout)}`;
+  if(q)       url+=`&q=${encodeURIComponent(q)}`;
+  const {ok,data}=await apiFetch(url);
+  if(!ok)return;
+  if(data.sites){
+    const s=document.getElementById('siteFilter');
+    if(s.options.length<=1) data.sites.forEach(si=>s.innerHTML+=`<option value="${si.site_id}">${si.site_name||si.site_id}</option>`);
+  }
+  const records=data.records||[];
+  document.getElementById('summaryTotal').textContent=data.total||0;
+  document.getElementById('summaryStockout').textContent=records.filter(r=>r.stockout==='Yes'||r.stockout_flag==='Yes').length;
+  document.getElementById('summaryLowStock').textContent=records.filter(r=>{const ei=Number(r.end_inv||r.ending_inventory||0);return ei>0&&ei<=10;}).length;
+  const tbody=document.getElementById('invTbody');
+  if(!records.length){tbody.innerHTML='<tr><td colspan="8"><div class="empty-state"><i class="fas fa-warehouse"></i><p>No inventory records</p></div></td></tr>';document.getElementById('invPager').innerHTML='';return;}
+  tbody.innerHTML=records.map(r=>{
+    const bi=Number(r.begin_inv||r.beginning_inventory||0);
+    const rep=Number(r.replenish||r.replenishment||0);
+    const ei=Number(r.end_inv||r.ending_inventory||0);
+    const cs=Number(r.current_stock||ei);
+    const sout=(r.stockout||r.stockout_flag||'No')==='Yes'||cs<=0;
+    const csColor=cs<=0?'var(--danger)':cs<=10?'var(--warn)':'var(--accent)';
+    const statusBadge=sout?'badge-red':cs<=10&&cs>0?'badge-warn':'badge-green';
+    const statusLabel=sout?'Stockout':cs<=10&&cs>0?'Low Stock':'In Stock';
+    const rd=JSON.stringify(r).replace(/"/g,'&quot;');
+    return `<tr>
+      <td style="font-weight:500">${r.product||r.product_name||'—'}</td>
+      <td><span class="badge badge-blue" style="font-size:.7rem">${r.site||r.site_name||'—'}</span></td>
+      <td style="text-align:center;color:var(--muted)">${bi.toLocaleString()}</td>
+      <td style="text-align:center;color:#3b82f6;font-weight:600">${rep.toLocaleString()}</td>
+      <td style="text-align:center;font-weight:700;color:${ei<=0?'var(--danger)':'var(--text)'}">${ei.toLocaleString()}</td>
+      <td style="text-align:center;font-weight:700;color:${csColor}">${cs.toLocaleString()}</td>
+      <td><span class="badge ${statusBadge}" style="font-size:.7rem">${statusLabel}</span></td>
+      <td><button onclick='openInvView(${rd})' style="width:28px;height:28px;background:var(--surface2);border:1px solid var(--border);border-radius:7px;cursor:pointer;color:var(--muted);display:inline-flex;align-items:center;justify-content:center" title="View Details"><i class="fas fa-eye" style="font-size:.75rem"></i></button></td>
+    </tr>`;
+  }).join('');
+  const pages=Math.ceil(data.total/(data.per_page||20));
+  const pager=document.getElementById('invPager');
+  let html=`<span>Page ${page} of ${pages} &nbsp;·&nbsp; ${data.total} records</span><div style="display:flex;gap:4px">`;
+  if(page>1) html+=`<button class="page-btn" onclick="loadInventory(${page-1})"><i class="fas fa-chevron-left" style="font-size:.6rem"></i></button>`;
+  for(let i=Math.max(1,page-2);i<=Math.min(pages,page+2);i++) html+=`<button class="page-btn${i===page?' active':''}" onclick="loadInventory(${i})">${i}</button>`;
+  if(page<pages) html+=`<button class="page-btn" onclick="loadInventory(${page+1})"><i class="fas fa-chevron-right" style="font-size:.6rem"></i></button>`;
+  pager.innerHTML=html+'</div>';
+}
+
+function openInvView(r){
+  const bi=Number(r.begin_inv||r.beginning_inventory||0);
+  const ei=Number(r.end_inv||r.ending_inventory||0);
+  const rep=Number(r.replenish||r.replenishment||0);
+  const stockOk=(r.stockout||r.stockout_flag||'No')==='No';
+  document.getElementById('invViewBody').innerHTML=`
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+      <div style="grid-column:1/-1;background:rgba(99,102,241,.08);border-radius:10px;padding:12px 14px;border:1px solid rgba(99,102,241,.2)">
+        <div style="font-size:.68rem;font-weight:700;text-transform:uppercase;color:#6366f1;letter-spacing:.06em">Product</div>
+        <div style="font-weight:700;font-size:.95rem;color:var(--text);margin-top:2px">${r.product||r.product_name||'—'}</div>
+        <div style="font-size:.72rem;color:var(--muted);margin-top:2px">${r.site||r.site_name||'—'}</div>
+      </div>
+      <div style="background:var(--surface2);border-radius:9px;padding:10px 12px;border:1px solid var(--border)">
+        <div style="font-size:.65rem;font-weight:700;color:var(--muted2);text-transform:uppercase">Beginning Inv.</div>
+        <div style="font-weight:700;font-size:1.1rem;color:#3b82f6">${bi.toLocaleString()}</div>
+      </div>
+      <div style="background:var(--surface2);border-radius:9px;padding:10px 12px;border:1px solid var(--border)">
+        <div style="font-size:.65rem;font-weight:700;color:var(--muted2);text-transform:uppercase">Ending Inv.</div>
+        <div style="font-weight:700;font-size:1.1rem;color:var(--text)">${ei.toLocaleString()}</div>
+      </div>
+      <div style="background:var(--surface2);border-radius:9px;padding:10px 12px;border:1px solid var(--border)">
+        <div style="font-size:.65rem;font-weight:700;color:var(--muted2);text-transform:uppercase">Replenishment</div>
+        <div style="font-weight:700;font-size:1.1rem;color:var(--accent)">${rep.toLocaleString()}</div>
+      </div>
+      <div style="background:var(--surface2);border-radius:9px;padding:10px 12px;border:1px solid var(--border)">
+        <div style="font-size:.65rem;font-weight:700;color:var(--muted2);text-transform:uppercase">Status</div>
+        <div style="margin-top:4px"><span class="badge ${stockOk?'badge-green':'badge-red'}">${stockOk?'In Stock':'Stockout'}</span></div>
+      </div>
+    </div>
+    <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;color:var(--muted2);letter-spacing:.06em;margin-bottom:8px">Order Integration</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+      <div style="background:rgba(14,107,63,.07);border:1px solid rgba(14,107,63,.25);border-radius:10px;padding:12px">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+          <i class="fas fa-file-invoice" style="color:var(--accent);font-size:.8rem"></i>
+          <span style="font-size:.68rem;font-weight:700;text-transform:uppercase;color:var(--accent)">Sales Orders</span>
+        </div>
+        <div style="font-size:1.2rem;font-weight:800;color:var(--text)">${Number(r.so_count||0)}</div>
+        <div style="font-size:.65rem;color:var(--muted)">orders placed</div>
+        <div style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(14,107,63,.15)">
+          <div style="font-size:.75rem;font-weight:700;color:var(--accent)">₹${Number(r.so_total||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
+          <div style="font-size:.62rem;color:var(--muted)">total SO value</div>
+        </div>
+      </div>
+      <div style="background:rgba(59,130,246,.07);border:1px solid rgba(59,130,246,.25);border-radius:10px;padding:12px">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+          <i class="fas fa-cart-shopping" style="color:#3b82f6;font-size:.8rem"></i>
+          <span style="font-size:.68rem;font-weight:700;text-transform:uppercase;color:#3b82f6">Purchase Orders</span>
+        </div>
+        <div style="font-size:1.2rem;font-weight:800;color:var(--text)">${Number(r.po_count||0)}</div>
+        <div style="font-size:.65rem;color:var(--muted)">orders received</div>
+        <div style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(59,130,246,.15)">
+          <div style="font-size:.75rem;font-weight:700;color:#3b82f6">₹${Number(r.po_total||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
+          <div style="font-size:.62rem;color:var(--muted)">total PO cost</div>
+        </div>
+      </div>
+    </div>
+  `;
+  document.getElementById('invViewModal').style.display='flex';
+}
+loadInventory(1);
+</script>
+{% endblock %}

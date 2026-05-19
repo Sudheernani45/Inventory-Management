@@ -1,0 +1,666 @@
+{% extends "admin/base.html" %}
+{% block title %}Sales Orders{% endblock %}
+{% block page_title %}Sales Orders{% endblock %}
+{% block content %}
+<style>
+/* ── Sales Orders UI ── */
+.so-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:22px;gap:16px;flex-wrap:wrap}
+.so-header-left h2{font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:1.28rem;color:var(--text);margin:0}
+.so-header-left p{color:var(--muted);font-size:.8rem;margin:4px 0 0}
+.so-tabs{display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:22px}
+.so-tab{padding:10px 22px;font-size:.85rem;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:2.5px solid transparent;margin-bottom:-2px;transition:all .18s;display:flex;align-items:center;gap:8px;user-select:none}
+.so-tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.so-tab:hover:not(.active){color:var(--text)}
+.tab-badge{background:var(--surface2);color:var(--muted);font-size:.68rem;font-weight:700;padding:2px 7px;border-radius:10px}
+.so-tab.active .tab-badge{background:var(--accent-dim);color:var(--accent)}
+/* Table container */
+.so-toolbar{display:flex;align-items:center;justify-content:space-between;padding:14px 0 10px;gap:12px;flex-wrap:wrap}
+.so-filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+/* Row actions */
+.so-action-wrap{display:flex;gap:5px;justify-content:flex-end;align-items:center}
+/* SO number style like image */
+.so-num{font-family:monospace;font-size:.8rem;color:var(--accent);font-weight:700;cursor:pointer;text-decoration:none}
+.so-num:hover{text-decoration:underline}
+/* Warehouse badge like image */
+.wh-badge{display:inline-block;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-size:.75rem;font-weight:700;padding:2px 9px;border-radius:6px;letter-spacing:.03em}
+/* Status badge */
+.badge-shipped{background:rgba(34,197,94,.12);color:#15803d;border:1px solid rgba(34,197,94,.3)}
+.badge-pending{background:rgba(245,158,11,.12);color:#b45309;border:1px solid rgba(245,158,11,.3)}
+.badge-confirmed{background:rgba(59,130,246,.12);color:#1d4ed8;border:1px solid rgba(59,130,246,.3)}
+.badge-cancelled{background:rgba(239,68,68,.1);color:#b91c1c;border:1px solid rgba(239,68,68,.2)}
+.badge-dispatched{background:rgba(139,92,246,.12);color:#6d28d9;border:1px solid rgba(139,92,246,.3)}
+/* Action icon btns */
+.act-btn{width:34px;height:34px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;color:var(--muted);transition:all .15s;font-size:.78rem}
+.act-btn:hover{background:var(--surface3);color:var(--text)}
+.act-btn.blue{background:rgba(59,130,246,.1);border-color:rgba(59,130,246,.3);color:#3b82f6}
+.act-btn.blue:hover{background:#3b82f6;color:#fff}
+/* Modals */
+.so-modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1000;align-items:center;justify-content:center;backdrop-filter:blur(5px)}
+.so-modal-box{background:var(--surface);border-radius:22px;width:100%;max-width:640px;margin:16px;box-shadow:0 40px 120px rgba(0,0,0,.3);overflow:hidden;max-height:94vh;display:flex;flex-direction:column}
+.so-modal-header{display:flex;align-items:center;justify-content:space-between;padding:22px 26px;border-bottom:1px solid var(--border);flex-shrink:0}
+.so-modal-body{padding:24px 26px;overflow-y:auto;flex:1}
+.so-modal-footer{padding:16px 26px;border-top:1px solid var(--border);display:flex;gap:10px;justify-content:flex-end;flex-shrink:0}
+.field-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.form-field label{display:block;font-size:.78rem;font-weight:700;color:var(--text);margin-bottom:6px}
+.form-field select,.form-field input{width:100%;padding:10px 13px;border:1.5px solid var(--border-md);border-radius:10px;font-size:.85rem;color:var(--text);background:var(--surface2);transition:border-color .15s;outline:none}
+.form-field select:focus,.form-field input:focus{border-color:var(--accent);background:#fff;box-shadow:0 0 0 3px rgba(14,107,63,.08)}
+.product-row{display:grid;grid-template-columns:1fr 80px 110px 36px;gap:8px;align-items:center;padding:0}
+.product-row-hdr{display:grid;grid-template-columns:1fr 80px 110px 36px;gap:8px;padding:7px 10px;background:var(--surface2);border-radius:8px;margin-bottom:6px}
+.product-row-hdr span{font-size:.66rem;font-weight:700;color:var(--muted2);text-transform:uppercase;letter-spacing:.07em}
+/* Dispatch option cards */
+.dispatch-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:20px 26px}
+.dispatch-card{border:2px solid var(--border);border-radius:14px;padding:18px 14px;cursor:pointer;text-align:center;transition:all .18s;background:var(--surface2)}
+.dispatch-card:hover{border-color:var(--accent);background:var(--accent-dim);transform:translateY(-2px)}
+.dispatch-card.sel{border-color:var(--accent);background:var(--accent-dim)}
+.dispatch-card .dc-icon{font-size:1.8rem;margin-bottom:8px}
+.dispatch-card .dc-label{font-weight:700;font-size:.9rem;color:var(--text)}
+.dispatch-card .dc-sub{color:var(--muted);font-size:.72rem;margin-top:3px}
+/* Total bar */
+.total-bar{background:linear-gradient(135deg,var(--green-brand),var(--accent2));border-radius:12px;padding:15px 22px;display:flex;align-items:center;justify-content:flex-end;margin-top:16px}
+.total-bar span{color:#fff;font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:1.1rem}
+</style>
+
+<!-- Page Header -->
+<div class="so-header">
+  <div class="so-header-left">
+    <h2>Order Management</h2>
+    <p>Manage sales orders and purchase orders.</p>
+  </div>
+  <button class="btn btn-primary" onclick="openSOModal()">
+    <i class="fas fa-plus-circle"></i> Create Sales Order
+  </button>
+</div>
+
+<!-- Tabs (Sales Orders / Purchase Orders) -->
+<div class="so-tabs">
+  <div class="so-tab active" id="tabSO" onclick="switchTab('so')">
+    <i class="fas fa-shopping-cart"></i> Sales Orders <span class="tab-badge" id="tabSOCount">—</span>
+  </div>
+</div>
+
+<!-- Toolbar -->
+<div class="so-toolbar">
+  <div class="so-filters">
+    <input type="email" id="soEmailFilter" class="form-control" placeholder="admin@inventoryiq.com" style="width:210px;font-size:.82rem" oninput="filterSOs()"/>
+    <select class="form-control" id="soStatusFilter" style="width:148px;font-size:.82rem" onchange="filterSOs()">
+      <option value="">All Statuses</option>
+      <option value="Pending">Pending</option>
+      <option value="Confirmed">Confirmed</option>
+      <option value="Dispatched">Dispatched</option>
+      <option value="Delivered">Delivered</option>
+      <option value="Cancelled">Cancelled</option>
+    </select>
+    <select class="form-control" id="soWarehouseFilter" style="width:162px;font-size:.82rem" onchange="filterSOs()">
+      <option value="">All Warehouses</option>
+    </select>
+  </div>
+  <span id="soCountLabel" style="font-size:.78rem;color:var(--muted)">Loading…</span>
+</div>
+
+<!-- Orders Table Card -->
+<div class="card" style="padding:0">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>SO#</th>
+          <th>CUSTOMER</th>
+          <th>WAREHOUSE</th>
+          <th>ORDER DATE</th>
+          <th>TOTAL</th>
+          <th>STATUS</th>
+          <th style="text-align:right">ACTIONS</th>
+        </tr>
+      </thead>
+      <tbody id="soTbody">
+        {% for i in range(6) %}
+        <tr class="skeleton-row"><td colspan="7"><div class="skeleton" style="height:14px"></div></td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div id="soPagination" style="padding:12px 20px"></div>
+</div>
+
+<!-- ═══════════════════════════════════
+     NEW SALES ORDER MODAL
+═══════════════════════════════════ -->
+<div class="so-modal-overlay" id="soModalOverlay">
+  <div class="so-modal-box">
+    <div class="so-modal-header">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div style="width:40px;height:40px;border-radius:11px;background:var(--accent-dim);display:flex;align-items:center;justify-content:center;color:var(--accent)"><i class="fas fa-file-invoice"></i></div>
+        <div>
+          <div style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:1rem;color:var(--text)">New Sales Order</div>
+          <div style="font-size:.73rem;color:var(--muted)">Linked to Inventory &amp; Logistics — stock decreases on confirm</div>
+        </div>
+      </div>
+      <button onclick="closeSOModal()" class="act-btn"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="so-modal-body">
+      <div class="field-grid" style="margin-bottom:16px">
+        <div class="form-field">
+          <label>Customer <span style="color:var(--danger)">*</span></label>
+          <div style="display:flex;gap:7px">
+            <select id="soCustomer" style="flex:1;padding:10px 13px;border:1.5px solid var(--border-md);border-radius:10px;font-size:.85rem;outline:none"><option value="">— Select Customer —</option></select>
+            <button onclick="openNewCustModal()" title="New Customer" style="width:42px;height:42px;border-radius:10px;background:var(--accent-dim);border:1.5px solid rgba(14,107,63,.3);color:var(--accent);cursor:pointer;font-size:.95rem;display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="fas fa-user-plus"></i></button>
+          </div>
+        </div>
+        <div class="form-field">
+          <label>State</label>
+          <select id="soState" onchange="loadSitesByState()" style="width:100%;padding:10px 13px;border:1.5px solid var(--border-md);border-radius:10px;font-size:.85rem;outline:none"><option value="">— Select State —</option></select>
+        </div>
+      </div>
+      <div class="form-field" style="margin-bottom:18px">
+        <label>Warehouse / Site <span style="color:var(--danger)">*</span></label>
+        <select id="soSite" onchange="loadStockForSite()" style="width:100%;padding:10px 13px;border:1.5px solid var(--border-md);border-radius:10px;font-size:.85rem;outline:none"><option value="">— Select Site —</option></select>
+        <div id="stockHint" style="font-size:.72rem;color:var(--muted);margin-top:5px"></div>
+      </div>
+      <!-- Products -->
+      <div style="margin-bottom:4px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <label style="font-size:.83rem;font-weight:700;color:var(--text);margin:0">Products</label>
+          <button onclick="addProductRow()" style="background:var(--surface2);border:1.5px solid var(--border);color:var(--accent);padding:6px 13px;border-radius:8px;font-size:.77rem;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px"><i class="fas fa-plus"></i> Add Row</button>
+        </div>
+        <div class="product-row-hdr">
+          <span>Product (Stock)</span><span>QTY</span><span>Amount (₹)</span><span></span>
+        </div>
+        <div id="productRows" style="display:flex;flex-direction:column;gap:8px"></div>
+      </div>
+      <div class="total-bar">
+        <span>Total: ₹<span id="soTotal">0.00</span></span>
+      </div>
+    </div>
+    <div class="so-modal-footer">
+      <button onclick="closeSOModal()" class="btn btn-ghost">Cancel</button>
+      <button onclick="placeSOOrder()" class="btn btn-primary"><i class="fas fa-paper-plane"></i> Place Order</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════
+     CONFIRM / CANCEL DIALOG
+═══════════════════════════════════ -->
+<div class="so-modal-overlay" id="soConfirmOverlay" style="z-index:1100">
+  <div style="background:var(--surface);border-radius:22px;width:100%;max-width:460px;margin:16px;box-shadow:0 40px 120px rgba(0,0,0,.3);overflow:hidden">
+    <div style="background:linear-gradient(135deg,var(--green-brand),var(--accent2));padding:24px 26px">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div style="width:44px;height:44px;border-radius:12px;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-size:1.1rem;color:#fff"><i class="fas fa-receipt"></i></div>
+        <div>
+          <div style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;color:#fff;font-size:1rem">Confirm Sales Order?</div>
+          <div style="color:rgba(255,255,255,.8);font-size:.75rem;margin-top:2px">Confirms order — decreases inventory &amp; creates logistics entry</div>
+        </div>
+      </div>
+    </div>
+    <div style="padding:22px 26px" id="soConfirmBody"></div>
+    <div style="display:flex;gap:10px;padding:0 26px 14px">
+      <button onclick="doSOAction('cancel')" class="btn" style="flex:1;background:#fff;border:1.5px solid var(--border);color:var(--text);padding:11px;border-radius:10px;font-weight:600"><i class="fas fa-times"></i> Cancel Order</button>
+      <button onclick="doSOAction('confirm')" class="btn btn-primary" style="flex:1;padding:11px;border-radius:10px;font-weight:700"><i class="fas fa-check"></i> Confirm &amp; Dispatch</button>
+    </div>
+    <div style="padding:0 26px 22px;text-align:center"><a onclick="closeSOConfirm()" style="color:var(--muted);font-size:.78rem;cursor:pointer;text-decoration:underline">Go back</a></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════
+     DISPATCH TYPE MODAL
+═══════════════════════════════════ -->
+<div class="so-modal-overlay" id="dispatchOverlay" style="z-index:1200">
+  <div style="background:var(--surface);border-radius:22px;width:100%;max-width:440px;margin:16px;box-shadow:0 40px 120px rgba(0,0,0,.3)">
+    <div style="padding:24px 26px 18px;border-bottom:1px solid var(--border)">
+      <div style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:1rem;color:var(--text)">Select Dispatch Type</div>
+      <div style="color:var(--muted);font-size:.76rem;margin-top:3px">Choose how this order will be shipped</div>
+    </div>
+    <div class="dispatch-grid">
+      <div class="dispatch-card" onclick="selectDispatch('Air')"><div class="dc-icon">✈️</div><div class="dc-label">Air</div><div class="dc-sub">Fast delivery</div></div>
+      <div class="dispatch-card" onclick="selectDispatch('Ship')"><div class="dc-icon">🚢</div><div class="dc-label">Ship</div><div class="dc-sub">Ocean freight</div></div>
+      <div class="dispatch-card" onclick="selectDispatch('Train')"><div class="dc-icon">🚂</div><div class="dc-label">Train</div><div class="dc-sub">Rail freight</div></div>
+      <div class="dispatch-card" onclick="selectDispatch('Truck')"><div class="dc-icon">🚛</div><div class="dc-label">Truck</div><div class="dc-sub">Road transport</div></div>
+    </div>
+    <div style="padding:0 26px 22px;text-align:center"><a onclick="closeDispatch()" style="color:var(--muted);font-size:.78rem;cursor:pointer;text-decoration:underline">Skip dispatch assignment</a></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════
+     VIEW ORDER DETAIL MODAL
+═══════════════════════════════════ -->
+<div class="so-modal-overlay" id="viewSOModal" style="z-index:1050">
+  <div class="so-modal-box" style="max-width:520px">
+    <div class="so-modal-header">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div style="width:38px;height:38px;border-radius:10px;background:var(--accent-dim);display:flex;align-items:center;justify-content:center;color:var(--accent)"><i class="fas fa-file-alt"></i></div>
+        <div style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:.98rem;color:var(--text)">Order Details</div>
+      </div>
+      <button onclick="closeViewSOModal()" class="act-btn"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="so-modal-body" id="viewSOBody"></div>
+    <div class="so-modal-footer">
+      <button onclick="closeViewSOModal()" class="btn btn-ghost">Close</button>
+      <button id="viewSOInvoiceBtn" class="btn btn-primary" onclick="openSOInvoice()" style="background:linear-gradient(135deg,#0e3d6e,#1565c0);display:none"><i class="fas fa-file-invoice"></i> &nbsp;Invoice / PDF</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════
+     ADD NEW CUSTOMER MODAL
+═══════════════════════════════════ -->
+<div class="so-modal-overlay" id="newCustOverlay" style="z-index:2000">
+  <div style="background:var(--surface);border-radius:20px;width:100%;max-width:490px;margin:16px;box-shadow:0 32px 100px rgba(0,0,0,.28);overflow:hidden">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid var(--border)">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="width:36px;height:36px;border-radius:9px;background:var(--accent-dim);display:flex;align-items:center;justify-content:center;color:var(--accent)"><i class="fas fa-user-plus"></i></div>
+        <div>
+          <div style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:.95rem;color:var(--text)">Add New Customer</div>
+          <div style="font-size:.72rem;color:var(--muted)">Will be auto-selected after creation</div>
+        </div>
+      </div>
+      <button onclick="closeNewCustModal()" class="act-btn"><i class="fas fa-times"></i></button>
+    </div>
+    <div style="padding:20px 24px;display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="form-field" style="grid-column:1/-1"><label>Customer ID <span style="color:var(--muted);font-size:.7rem">(auto-generated if blank)</span></label><input type="text" id="ncCustId" placeholder="e.g. CUST10025"/></div>
+      <div class="form-field"><label>Age</label><input type="number" id="ncAge" placeholder="25" min="1" max="120"/></div>
+      <div class="form-field"><label>Gender</label><select id="ncGender"><option value="">— Select —</option><option>Male</option><option>Female</option><option>Other</option></select></div>
+      <div class="form-field"><label>Income Bracket</label><select id="ncIncome"><option value="">— Select —</option><option>Low</option><option>Medium</option><option>High</option></select></div>
+      <div class="form-field"><label>Purchase Frequency</label><input type="number" id="ncFreq" placeholder="0" min="0"/></div>
+      <div class="form-field"><label>Avg Spend (₹)</label><input type="number" id="ncSpend" placeholder="0.00" step="0.01"/></div>
+      <div class="form-field" style="grid-column:1/-1"><label>Preferred Categories</label><input type="text" id="ncCategories" placeholder="e.g. Electronics, Food"/></div>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;padding:0 24px 20px">
+      <button onclick="closeNewCustModal()" class="btn btn-ghost" style="border-radius:9px">Cancel</button>
+      <button onclick="saveNewCustomer()" class="btn btn-primary" id="saveNewCustBtn" style="border-radius:9px"><i class="fas fa-user-plus"></i> Create &amp; Select</button>
+    </div>
+  </div>
+</div>
+
+<!-- TRACKING MODAL -->
+<div class="so-modal-overlay" id="trackModal" style="z-index:2000">
+  <div style="background:var(--surface);border-radius:20px;width:100%;max-width:560px;margin:16px;max-height:92vh;overflow-y:auto;box-shadow:0 32px 100px rgba(0,0,0,.28)">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:22px 24px 16px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface);z-index:1;border-radius:20px 20px 0 0">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="width:36px;height:36px;border-radius:9px;background:var(--accent-dim);display:flex;align-items:center;justify-content:center;color:var(--accent)"><i class="fas fa-route"></i></div>
+        <div>
+          <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:1rem;font-weight:800;color:var(--text)">Order Tracking</div>
+          <div style="font-size:.72rem;color:var(--muted)">Live shipment &amp; delivery status</div>
+        </div>
+      </div>
+      <button onclick="closeTrackModal()" class="act-btn"><i class="fas fa-times"></i></button>
+    </div>
+    <div id="trackModalBody" style="padding:20px 24px 24px"></div>
+  </div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+const DISPATCH_ICONS={'Air':'✈️','Ship':'🚢','Train':'🚂','Truck':'🚛','Road':'🚛','Rail':'🚂'};
+const SO_STATUS_BADGE={'Pending':'badge-pending','Confirmed':'badge-confirmed','Dispatched':'badge-dispatched','Delivered':'badge-shipped','Cancelled':'badge-cancelled','Processing':'badge-confirmed'};
+let allSOs=[], sitesCache=[], productsCache=[], pendingSONumber=null, rowIndex=0;
+let currentTab='so';
+
+/* ── Tab switching ── */
+function switchTab(tab){
+  currentTab=tab;
+  document.getElementById('tabSO').classList.toggle('active',tab==='so');
+  document.getElementById('tabPO').classList.toggle('active',tab==='po');
+  if(tab==='so') loadSOs(); else loadPOs();
+}
+
+/* ── Warehouse filter populate ── */
+function populateWarehouseFilter(orders){
+  const wh=new Set(orders.map(o=>o.site||o.warehouse||o.site_id).filter(Boolean));
+  const sel=document.getElementById('soWarehouseFilter');
+  const cur=sel.value;
+  sel.innerHTML='<option value="">All Warehouses</option>';
+  [...wh].sort().forEach(w=>sel.innerHTML+=`<option value="${w}">${w}</option>`);
+  if(cur) sel.value=cur;
+}
+
+/* ── Load Sales Orders ── */
+async function loadSOs(){
+  const tbody=document.getElementById('soTbody');
+  tbody.innerHTML=Array(6).fill(`<tr>${Array(7).fill('<td><div class="skeleton" style="height:13px;width:80%"></div></td>').join('')}</tr>`).join('');
+  try{
+    const {ok,data}=await apiFetch('/admin/api/sales-orders');
+    if(!ok){tbody.innerHTML='<tr><td colspan="7"><div class="empty-state"><p>Failed to load</p></div></td></tr>';return;}
+    allSOs=data.orders||[];
+    document.getElementById('tabSOCount').textContent=allSOs.length;
+    populateWarehouseFilter(allSOs);
+    filterSOs();
+  }catch(e){tbody.innerHTML='<tr><td colspan="7"><div class="empty-state"><p>Error loading orders</p></div></td></tr>';}
+}
+
+async function loadPOs(){
+  const tbody=document.getElementById('soTbody');
+  tbody.innerHTML=Array(4).fill(`<tr>${Array(7).fill('<td><div class="skeleton" style="height:13px;width:80%"></div></td>').join('')}</tr>`).join('');
+  try{
+    const {ok,data}=await apiFetch('/admin/api/purchase-orders');
+    if(!ok){tbody.innerHTML='<tr><td colspan="7"><div class="empty-state"><p>Failed to load POs</p></div></td></tr>';return;}
+    const pos=data.orders||data.purchase_orders||[];
+    document.getElementById('tabPOCount').textContent=pos.length;
+    if(!pos.length){tbody.innerHTML='<tr><td colspan="7"><div class="empty-state"><i class="fas fa-shopping-bag"></i><p>No purchase orders</p></div></td></tr>';return;}
+    tbody.innerHTML=pos.map((o,i)=>`<tr>
+      <td><span class="so-num">${o.po_number||'—'}</span></td>
+      <td style="font-weight:600">${o.supplier||'—'}</td>
+      <td><span class="wh-badge">${o.site||'—'}</span></td>
+      <td style="font-size:.78rem;color:var(--muted)">${o.created_at||'—'}</td>
+      <td style="font-weight:700;color:var(--success)">₹${Number(o.total_cost||0).toLocaleString('en-IN',{minimumFractionDigits:2})}</td>
+      <td><span class="badge ${SO_STATUS_BADGE[o.status]||'badge-pending'}">${o.status||'—'}</span></td>
+      <td><div class="so-action-wrap"><button class="act-btn blue" title="View" onclick="viewPO(${i})"><i class="fas fa-eye"></i></button><button class="act-btn blue" title="Invoice / Download PDF" onclick="window.open('/admin/invoice/po/${o.po_number}','_blank')"><i class="fas fa-file-invoice" style="color:#10b981"></i></button></div></td>
+    </tr>`).join('');
+  }catch(e){}
+}
+
+function filterSOs(){
+  const q=(document.getElementById('soEmailFilter').value||'').toLowerCase();
+  const status=document.getElementById('soStatusFilter').value;
+  const wh=document.getElementById('soWarehouseFilter').value;
+  let f=allSOs;
+  if(q) f=f.filter(o=>(o.so_number||'').toLowerCase().includes(q)||(o.customer||'').toLowerCase().includes(q)||(o.customer_email||'').toLowerCase().includes(q));
+  if(status) f=f.filter(o=>o.status===status);
+  if(wh) f=f.filter(o=>(o.site||o.warehouse||o.site_id||'')==wh);
+  document.getElementById('soCountLabel').textContent=`${f.length} order${f!==1?'s':''}`;
+  renderSOTable(f);
+}
+
+function renderSOTable(orders){
+  const tbody=document.getElementById('soTbody');
+  if(!orders.length){tbody.innerHTML='<tr><td colspan="7"><div class="empty-state"><i class="fas fa-receipt"></i><p>No sales orders found</p></div></td></tr>';return;}
+  tbody.innerHTML=orders.map((o,i)=>{
+    const ic=Array.isArray(o.items)?o.items.length:1;
+    const dispIcon=o.dispatch_type?DISPATCH_ICONS[o.dispatch_type]||'📦':'';
+    const date=o.created_at?o.created_at.substring(0,10):'—';
+    const invBtn=`<button class="act-btn blue" title="Invoice / Download PDF" onclick="window.open('/admin/invoice/so/${o.so_number}','_blank')"><i class="fas fa-file-invoice" style="color:#10b981"></i></button>`;
+    let actions='';
+    if(o.status==='Pending'){
+      actions=`<button class="act-btn blue" title="View" onclick="viewSODetail(${allSOs.indexOf(o)})"><i class="fas fa-eye"></i></button>
+        <button class="act-btn blue" onclick="showSOConfirmForExisting('${o.so_number}')" title="Confirm"><i class="fas fa-check" style="color:#22c55e"></i></button>${invBtn}`;
+    } else if(o.status==='Confirmed'||o.status==='Processing'){
+      actions=`<button class="act-btn blue" title="View" onclick="viewSODetail(${allSOs.indexOf(o)})"><i class="fas fa-eye"></i></button>
+        <button class="act-btn blue" onclick="showDispatchOverlay('${o.so_number}')" title="Dispatch"><i class="fas fa-truck" style="color:#3b82f6"></i></button>${invBtn}`;
+    } else if(o.status==='Dispatched'){
+      actions=`<button class="act-btn blue" title="View" onclick="viewSODetail(${allSOs.indexOf(o)})"><i class="fas fa-eye"></i></button>
+        <button class="act-btn blue" onclick="trackShipment('${o.so_number}','${o.dispatch_type||''}')" title="Track"><i class="fas fa-location-dot" style="color:#a855f7"></i></button>${invBtn}`;
+    } else {
+      const retBtn=o.status==='Delivered'?`<a class="act-btn blue" href="/admin/sales-returns?so=${o.so_number}" title="Return"><i class="fas fa-rotate-left" style="color:#ef4444"></i></a>`:'';
+      actions=`<button class="act-btn blue" title="View" onclick="viewSODetail(${allSOs.indexOf(o)})"><i class="fas fa-eye"></i></button>${invBtn}${retBtn}`;
+    }
+    return `<tr>
+      <td><a class="so-num" onclick="viewSODetail(${allSOs.indexOf(o)});return false">${o.so_number||'—'}</a></td>
+      <td style="font-weight:600;font-size:.85rem">${o.customer||o.customer_id||'—'}</td>
+      <td><span class="wh-badge">${o.site||'—'}</span></td>
+      <td style="font-size:.8rem;color:var(--muted)">${date}</td>
+      <td style="font-weight:700">₹${Number(o.total_amount||0).toLocaleString('en-IN',{minimumFractionDigits:2})}</td>
+      <td><span class="badge ${SO_STATUS_BADGE[o.status]||'badge-pending'}">${o.status||'—'}</span></td>
+      <td><div class="so-action-wrap">${actions}</div></td>
+    </tr>`;
+  }).join('');
+}
+
+/* ── View SO Detail ── */
+let currentViewSONumber=null;
+function viewSODetail(i){
+  const o=allSOs[i]; if(!o) return;
+  currentViewSONumber=o.so_number;
+  const invBtn=document.getElementById('viewSOInvoiceBtn');
+  if(invBtn){invBtn.style.display='';}
+  const items=Array.isArray(o.items)?o.items:[];
+  const badge=SO_STATUS_BADGE[o.status]||'badge-pending';
+  document.getElementById('viewSOBody').innerHTML=`
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div style="background:linear-gradient(135deg,#1b3a6b,#1a5ea8);border-radius:14px;padding:18px 20px;color:#fff">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <div>
+            <div style="font-size:.65rem;opacity:.7;text-transform:uppercase;letter-spacing:.09em">Order Reference</div>
+            <div style="font-family:monospace;font-size:1rem;font-weight:800;margin-top:2px">${o.so_number}</div>
+          </div>
+          <span class="badge ${badge}" style="background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.3)">${o.status}</span>
+        </div>
+        <div style="margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,.15);display:flex;justify-content:space-between">
+          <span style="opacity:.75;font-size:.78rem">${o.customer||'—'}</span>
+          <span style="opacity:.75;font-size:.78rem">${o.site||'—'}</span>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="view-field"><div class="view-label">Date</div><div class="view-value">${(o.created_at||'').substring(0,10)||'—'}</div></div>
+        <div class="view-field"><div class="view-label">Total</div><div class="view-value highlight">₹${Number(o.total_amount||0).toLocaleString('en-IN',{minimumFractionDigits:2})}</div></div>
+      </div>
+      ${items.length?`<div style="border:1px solid var(--border);border-radius:10px;overflow:hidden">
+        <div style="padding:10px 14px;background:var(--surface2);font-size:.72rem;font-weight:700;color:var(--muted2);text-transform:uppercase;letter-spacing:.07em">Items (${items.length})</div>
+        ${items.map(it=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-top:1px solid var(--border)">
+          <div>
+            <div style="font-size:.82rem;font-weight:600">${it.product_name||it.product_id||'—'}</div>
+            <div style="font-size:.72rem;color:var(--muted)">Qty: ${it.quantity||'—'} × ₹${Number(it.unit_price||0).toFixed(2)}</div>
+          </div>
+          <div style="font-weight:700;font-size:.85rem">₹${Number((it.quantity||0)*(it.unit_price||0)).toLocaleString('en-IN',{minimumFractionDigits:2})}</div>
+        </div>`).join('')}
+      </div>`:'<p style="color:var(--muted);font-size:.8rem;text-align:center;padding:14px">No item details</p>'}
+    </div>`;
+  document.getElementById('viewSOModal').style.display='flex';
+}
+function openSOInvoice(){if(currentViewSONumber)window.open('/admin/invoice/so/'+currentViewSONumber,'_blank');}
+function closeViewSOModal(){document.getElementById('viewSOModal').style.display='none';currentViewSONumber=null;const b=document.getElementById('viewSOInvoiceBtn');if(b)b.style.display='none';}
+
+/* ── New SO Modal ── */
+async function openSOModal(){
+  document.getElementById('soModalOverlay').style.display='flex';
+  document.getElementById('soCustomer').innerHTML='<option value="">— Loading… —</option>';
+  document.getElementById('soState').innerHTML='<option value="">— Select State —</option>';
+  document.getElementById('soSite').innerHTML='<option value="">— Select Site —</option>';
+  document.getElementById('stockHint').textContent='';
+  document.getElementById('productRows').innerHTML='';
+  document.getElementById('soTotal').textContent='0.00';
+  productsCache=[]; rowIndex=0;
+  try{
+    const {ok,data}=await apiFetch('/admin/api/customers?per_page=500');
+    const csel=document.getElementById('soCustomer');
+    csel.innerHTML='<option value="">— Select Customer —</option>';
+    if(ok&&data.customers) data.customers.forEach(c=>csel.innerHTML+=`<option value="${c.customer_id}">${c.customer_id}</option>`);
+  }catch(e){}
+  try{
+    const {ok,data}=await apiFetch('/api/states');
+    if(ok&&data.states){const ssel=document.getElementById('soState');data.states.forEach(s=>ssel.innerHTML+=`<option value="${s.state_id}">${s.state_name}</option>`);}
+  }catch(e){}
+  try{
+    const {ok,data}=await apiFetch('/api/sites-list');
+    if(ok&&data.sites){sitesCache=data.sites;const ssel=document.getElementById('soSite');data.sites.forEach(s=>ssel.innerHTML+=`<option value="${s.site_id}">${s.site_id} — ${s.site_name}</option>`);}
+  }catch(e){}
+  addProductRow();
+}
+function closeSOModal(){document.getElementById('soModalOverlay').style.display='none';}
+document.getElementById('soModalOverlay').addEventListener('click',e=>{if(e.target===document.getElementById('soModalOverlay'))closeSOModal();});
+
+async function loadSitesByState(){
+  const stateId=document.getElementById('soState').value;
+  const ssel=document.getElementById('soSite');
+  ssel.innerHTML='<option value="">— Select Site —</option>';
+  if(!stateId){sitesCache.forEach(s=>ssel.innerHTML+=`<option value="${s.site_id}">${s.site_id} — ${s.site_name}</option>`);return;}
+  try{const {ok,data}=await apiFetch(`/api/sites-by-state/${stateId}`);if(ok&&data.sites)data.sites.forEach(s=>ssel.innerHTML+=`<option value="${s.site_id}">${s.site_id} — ${s.site_name}</option>`);}catch(e){}
+}
+async function loadStockForSite(){
+  const siteId=document.getElementById('soSite').value;
+  const hint=document.getElementById('stockHint');
+  if(!siteId){hint.textContent='';return;}
+  try{
+    const {ok,data}=await apiFetch(`/admin/products/list?page=1&per_page=500&site_id=${siteId}&in_stock=1`);
+    if(ok&&data.products){
+      productsCache=data.products;
+      const n=productsCache.length;
+      hint.innerHTML=n>0?`<i class="fas fa-circle-check" style="color:var(--accent)"></i> <strong>${n}</strong> products available at this site.`:`<i class="fas fa-exclamation-triangle" style="color:var(--warn)"></i> No stock available.`;
+      document.getElementById('productRows').querySelectorAll('.prod-select').forEach(sel=>{
+        const cur=sel.value;
+        sel.innerHTML='<option value="">— Select —</option>'+productsCache.map(p=>`<option value="${p.product_id}" data-price="${p.unit_price||0}" data-stock="${p.stock_qty!=null?p.stock_qty:99999}">${p.product_name||p.product_id}${p.stock_qty!=null?' ('+p.stock_qty+')':''}</option>`).join('');
+        if(cur)sel.value=cur;
+      });
+    }
+  }catch(e){hint.textContent='';}
+}
+
+function addProductRow(){
+  rowIndex++;
+  const rid=`row_${rowIndex}`;
+  const opts=productsCache.length?'<option value="">— Select —</option>'+productsCache.map(p=>`<option value="${p.product_id}" data-price="${p.unit_price||0}" data-stock="${p.stock_qty!=null?p.stock_qty:99999}">${p.product_name||p.product_id}${p.stock_qty!=null?' ('+p.stock_qty+')':''}</option>`).join(''):'<option value="">Select a site first</option>';
+  const row=document.createElement('div');
+  row.id=rid; row.className='product-row';
+  row.innerHTML=`
+    <select class="form-control prod-select" onchange="onProdChange('${rid}')" style="height:42px;border-radius:8px;font-size:.82rem">${opts}</select>
+    <input type="number" class="form-control qty-input" min="1" value="1" oninput="validateQty('${rid}');calcRowAmount('${rid}')" style="height:42px;border-radius:8px;text-align:center;font-size:.88rem"/>
+    <input type="text" class="form-control amt-input" readonly placeholder="0.00" style="height:42px;border-radius:8px;background:var(--surface2);color:var(--muted);font-size:.88rem;text-align:right"/>
+    <button onclick="removeRow('${rid}')" style="width:34px;height:34px;border-radius:8px;background:rgba(239,68,68,.1);border:none;color:var(--danger);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.8rem"><i class="fas fa-times"></i></button>`;
+  document.getElementById('productRows').appendChild(row);
+}
+function removeRow(rid){const el=document.getElementById(rid);if(el)el.remove();calcTotal();}
+function onProdChange(rid){const row=document.getElementById(rid);if(!row)return;const sel=row.querySelector('.prod-select');const opt=sel.options[sel.selectedIndex];const price=parseFloat(opt?.dataset?.price||0);const qty=parseInt(row.querySelector('.qty-input').value)||1;row.querySelector('.amt-input').value=(price*qty).toFixed(2);calcTotal();}
+function calcRowAmount(rid){const row=document.getElementById(rid);if(!row)return;const sel=row.querySelector('.prod-select');const opt=sel?.options[sel.selectedIndex];const price=parseFloat(opt?.dataset?.price||0);const qty=parseInt(row.querySelector('.qty-input').value)||0;row.querySelector('.amt-input').value=(price*qty).toFixed(2);calcTotal();}
+function calcTotal(){let t=0;document.querySelectorAll('.amt-input').forEach(el=>{t+=parseFloat(el.value)||0;});document.getElementById('soTotal').textContent=t.toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function validateQty(rid){const row=document.getElementById(rid);if(!row)return;const sel=row.querySelector('.prod-select');const opt=sel?sel.options[sel.selectedIndex]:null;const stock=opt?parseInt(opt.dataset.stock||'99999'):99999;const qi=row.querySelector('.qty-input');const qty=parseInt(qi.value)||0;if(qty>stock&&stock>=0){qi.value=stock;qi.style.borderColor='var(--danger)';showToast&&showToast('Cannot exceed available stock ('+stock+')','error');}else qi.style.borderColor='';}
+
+async function placeSOOrder(){
+  const customer=document.getElementById('soCustomer').value;
+  const stSel=document.getElementById('soState');const state=stSel.options[stSel.selectedIndex]?.text||'';
+  const site=document.getElementById('soSite').value;
+  if(!customer||!site){showToast&&showToast('Customer and site required','error');return;}
+  const items=[]; let hasErr=false;
+  document.getElementById('productRows').querySelectorAll('div[id^="row_"]').forEach(row=>{
+    const sel=row.querySelector('.prod-select');const prodId=sel?.value;const opt=sel?.options[sel.selectedIndex];const prodName=opt?.text||'';const qty=parseInt(row.querySelector('.qty-input')?.value)||0;const price=parseFloat(opt?.dataset?.price||0);
+    if(prodId&&qty>0){const stock=parseInt(opt?.dataset?.stock||'99999');if(qty>stock&&stock>=0){showToast&&showToast(`Cannot order ${qty} of ${prodName||prodId} — only ${stock} in stock`,'error');hasErr=true;return;}items.push({product_id:prodId,product_name:prodName,quantity:qty,unit_price:price});}
+  });
+  if(hasErr||!items.length){if(!hasErr)showToast&&showToast('Add at least one product','error');return;}
+  const {ok,data}=await apiFetch('/admin/api/sales-orders',{method:'POST',body:JSON.stringify({customer,state,site,items})});
+  if(ok&&data.status==='success'){
+    closeSOModal(); pendingSONumber=data.so_number;
+    showSOConfirmDialog({so_number:data.so_number,customer,site,items,total:parseFloat(document.getElementById('soTotal').textContent.replace(/,/g,''))});
+    loadSOs();
+  } else showToast&&showToast(data.message||'Error','error');
+}
+
+/* ── Confirm Dialog ── */
+function showSOConfirmDialog(so){
+  const items=Array.isArray(so.items)?so.items.map(i=>`<div style="display:flex;justify-content:space-between;font-size:.78rem;padding:4px 0;border-bottom:1px solid var(--border)"><span style="color:var(--muted)">${i.product_name||i.product_id}</span><span>×${i.quantity} = ₹${(i.quantity*(i.unit_price||0)).toFixed(2)}</span></div>`).join(''):'';
+  document.getElementById('soConfirmBody').innerHTML=`
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;justify-content:space-between;padding:10px 14px;background:var(--surface2);border-radius:10px"><span style="color:var(--muted);font-size:.8rem">Order Ref</span><strong style="font-family:monospace;color:var(--accent)">${so.so_number}</strong></div>
+      <div style="display:flex;justify-content:space-between;padding:10px 14px;background:var(--surface2);border-radius:10px"><span style="color:var(--muted);font-size:.8rem">Customer</span><strong>${so.customer}</strong></div>
+      <div style="display:flex;justify-content:space-between;padding:10px 14px;background:var(--surface2);border-radius:10px"><span style="color:var(--muted);font-size:.8rem">Site</span><strong>${so.site}</strong></div>
+      <div style="padding:10px 14px;background:var(--surface2);border-radius:10px"><div style="color:var(--muted);font-size:.8rem;margin-bottom:6px">Products</div>${items}</div>
+      <div style="display:flex;justify-content:space-between;padding:12px 14px;background:var(--accent-dim);border-radius:10px;border:1.5px solid var(--accent)"><span style="color:var(--accent);font-size:.82rem;font-weight:600">Total</span><strong style="color:var(--accent);font-size:1rem">₹${so.total?.toFixed(2)||'—'}</strong></div>
+      <div style="padding:10px 14px;background:rgba(239,68,68,.07);border-radius:8px;font-size:.76rem;color:var(--muted)"><i class="fas fa-exclamation-circle" style="color:var(--danger)"></i> <strong>Confirming</strong> will decrease inventory and create a logistics record.</div>
+    </div>`;
+  document.getElementById('soConfirmOverlay').style.display='flex';
+}
+function closeSOConfirm(){document.getElementById('soConfirmOverlay').style.display='none';pendingSONumber=null;}
+function showSOConfirmForExisting(soNum){const so=allSOs.find(o=>o.so_number===soNum);if(!so)return;pendingSONumber=soNum;showSOConfirmDialog({so_number:so.so_number,customer:so.customer,site:so.site,items:so.items||[],total:so.total_amount||0});}
+
+async function doSOAction(action){
+  if(!pendingSONumber)return;
+  const soNum=pendingSONumber; pendingSONumber=null;
+  if(action==='cancel'){
+    const {ok,data}=await apiFetch(`/admin/api/sales-orders/${soNum}/cancel`,{method:'POST'});
+    closeSOConfirm();
+    if(ok&&data.status==='success'){showToast&&showToast('Order cancelled','info');loadSOs();}
+    else showToast&&showToast(data.message||'Error','error');
+    return;
+  }
+  const {ok,data}=await apiFetch(`/admin/api/sales-orders/${soNum}/confirm`,{method:'POST'});
+  closeSOConfirm();
+  if(ok&&data.status==='success'){showToast&&showToast('Order confirmed — inventory updated','success');loadSOs();pendingSONumber=soNum;document.getElementById('dispatchOverlay').style.display='flex';}
+  else showToast&&showToast(data.message||'Error','error');
+}
+
+/* ── Dispatch ── */
+function closeDispatch(){document.getElementById('dispatchOverlay').style.display='none';pendingSONumber=null;loadSOs();}
+function showDispatchOverlay(soNum){pendingSONumber=soNum;document.getElementById('dispatchOverlay').style.display='flex';}
+async function selectDispatch(type){
+  const soNum=pendingSONumber; pendingSONumber=null;
+  document.getElementById('dispatchOverlay').style.display='none';
+  if(!soNum)return;
+  const {ok,data}=await apiFetch(`/admin/api/sales-orders/${soNum}/dispatch`,{method:'POST',body:JSON.stringify({dispatch_type:type})});
+  if(ok&&data.status==='success')showToast&&showToast(`Dispatched via ${type} ${DISPATCH_ICONS[type]}`,'success');
+  else showToast&&showToast('Dispatch recorded','info');
+  loadSOs();
+}
+
+/* ── Track Shipment ── */
+async function trackShipment(soNum,dispatchType){
+  const typeLabel=dispatchType||'Truck';
+  const icon=DISPATCH_ICONS[typeLabel]||'📦';
+  document.getElementById('trackModalBody').innerHTML='<div style="text-align:center;padding:40px"><span class="spinner"></span></div>';
+  document.getElementById('trackModal').style.display='flex';
+  try{
+    const {ok,data}=await apiFetch(`/admin/api/sales-orders/${soNum}/tracking`);
+    if(!ok||data.status!=='success'){document.getElementById('trackModalBody').innerHTML='<div style="text-align:center;padding:30px;color:var(--danger)">Failed to load tracking info.</div>';return;}
+    renderTrackModal(data,icon,typeLabel);
+  }catch(e){document.getElementById('trackModalBody').innerHTML='<div style="text-align:center;padding:30px;color:var(--danger)">Error loading tracking.</div>';}
+}
+function closeTrackModal(){document.getElementById('trackModal').style.display='none';}
+
+function renderTrackModal(d,icon,typeLabel){
+  const SC={'Pending':'#fef3c7|#92400e','Confirmed':'#dbeafe|#1e40af','Dispatched':'#ede9fe|#5b21b6','Delivered':'#dcfce7|#166534','Cancelled':'#fee2e2|#991b1b'};
+  const [scBg,scCol]=(SC[d.so_status]||'#f3f4f6|#374151').split('|');
+  const stages=[
+    {stage:'Order Placed',done:true,date:d.created_at||''},
+    {stage:'Processing',done:!!d.confirmed_at,date:d.confirmed_at||''},
+    {stage:'Shipped',done:!!d.dispatched_at,date:d.dispatched_at||''},
+    {stage:'Delivered',done:d.so_status==='Delivered',date:''},
+  ];
+  const lastDone=stages.reduce((acc,s,i)=>s.done?i:acc,0);
+  const timelineHTML=`<div style="display:flex;align-items:flex-start;gap:0;margin:16px 0 20px;padding:0 8px">
+    ${stages.map((s,i)=>`<div style="flex:1;display:flex;flex-direction:column;align-items:center;position:relative">
+      <div style="width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+        background:${s.done?'var(--green-brand)':'var(--surface2)'};color:${s.done?'#fff':'var(--muted)'};border:2.5px solid ${s.done?'var(--green-brand)':'var(--border)'}">
+        <i class="fas ${s.done?'fa-check':'fa-circle'}" style="font-size:.65rem"></i>
+      </div>
+      <div style="font-size:.68rem;font-weight:700;color:${s.done?'var(--text)':'var(--muted)'};margin-top:6px;text-align:center">${s.stage}</div>
+      ${s.date?`<div style="font-size:.62rem;color:var(--muted2);margin-top:1px">${s.date.substring(0,10)}</div>`:''}
+      ${i<stages.length-1?`<div style="position:absolute;top:17px;left:calc(50% + 17px);right:calc(-50% + 17px);height:2px;background:${stages[i+1]&&stages[i+1].done?'var(--green-brand)':'var(--border)'}"></div>`:''}
+    </div>`).join('')}
+  </div>`;
+  const shipHTML=d.shipments&&d.shipments.length?d.shipments.map(s=>`<div style="display:flex;align-items:center;gap:10px;padding:11px 13px;background:var(--surface2);border-radius:10px;border:1px solid var(--border);margin-bottom:8px">
+    <div style="flex:1"><div style="font-size:.82rem;font-weight:600">${s.product_name||s.product_id||'—'}</div><div style="font-size:.7rem;color:var(--muted)">ID: ${s.shipment_id} · Qty: ${s.quantity} · ${s.transportation_type||'—'}</div></div>
+    <span class="badge badge-blue" style="font-size:.7rem">${s.delivery_status||'—'}</span>
+  </div>`).join(''):`<div style="text-align:center;padding:16px;color:var(--muted);font-size:.82rem">No shipment records yet</div>`;
+  document.getElementById('trackModalBody').innerHTML=`
+    <div style="background:${scBg};border-radius:12px;padding:13px 17px;display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <div><div style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:${scCol}">Status</div><div style="font-weight:800;color:${scCol};font-size:1rem">${d.so_status}</div></div>
+      <div style="text-align:right"><div style="font-size:.68rem;color:${scCol};opacity:.8">Via</div><div style="font-weight:700;color:${scCol}">${icon} ${typeLabel}</div></div>
+    </div>
+    <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted2);margin-bottom:4px">Order Timeline</div>
+    ${timelineHTML}
+    <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted2);margin-bottom:8px">Shipments</div>
+    ${shipHTML}`;
+}
+
+/* ── New Customer ── */
+function openNewCustModal(){document.getElementById('newCustOverlay').style.display='flex';}
+function closeNewCustModal(){document.getElementById('newCustOverlay').style.display='none';}
+async function saveNewCustomer(){
+  const btn=document.getElementById('saveNewCustBtn');
+  btn.disabled=true;btn.innerHTML='<span class="spinner" style="width:14px;height:14px;margin-right:6px"></span>Creating…';
+  try{
+    const {ok,data}=await apiFetch('/admin/api/customers',{method:'POST',body:JSON.stringify({
+      customer_id:document.getElementById('ncCustId').value.trim()||undefined,
+      age:document.getElementById('ncAge').value||0,gender:document.getElementById('ncGender').value,
+      income_bracket:document.getElementById('ncIncome').value,
+      purchase_frequency:document.getElementById('ncFreq').value||0,
+      average_spend:document.getElementById('ncSpend').value||0,
+      preferred_categories:document.getElementById('ncCategories').value
+    })});
+    if(ok&&data.customer_id){
+      const sel=document.getElementById('soCustomer');
+      const opt=new Option(data.customer_id,data.customer_id);
+      sel.appendChild(opt);sel.value=data.customer_id;
+      showToast&&showToast(`Customer ${data.customer_id} created`,'success');
+      closeNewCustModal();
+    }else showToast&&showToast(data.message||'Error','error');
+  }catch(e){showToast&&showToast('Error','error');}
+  btn.disabled=false;btn.innerHTML='<i class="fas fa-user-plus"></i> Create & Select';
+}
+
+/* ── Overlay close on outside click ── */
+['soConfirmOverlay','dispatchOverlay','viewSOModal','newCustOverlay','trackModal'].forEach(id=>{
+  const el=document.getElementById(id);
+  if(el) el.addEventListener('click',e=>{if(e.target===el){el.style.display='none';if(id==='soConfirmOverlay'||id==='dispatchOverlay')pendingSONumber=null;}});
+});
+
+/* ── Init ── */
+loadSOs();
+</script>
+{% endblock %}

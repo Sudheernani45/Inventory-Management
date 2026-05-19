@@ -1,0 +1,331 @@
+{% extends "admin/base.html" %}
+{% block title %}Sales Returns{% endblock %}
+{% block page_title %}<i class="fas fa-rotate-left" style="color:var(--accent);margin-right:8px"></i>Sales Returns{% endblock %}
+
+{% block content %}
+<!-- Stats bar -->
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px">
+  <div class="card" style="padding:16px 18px;margin:0">
+    <div style="font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;font-weight:600">Total Returns</div>
+    <div style="font-size:1.5rem;font-weight:800;font-family:'Plus Jakarta Sans',sans-serif;color:var(--text);margin-top:4px" id="srStatTotal">—</div>
+  </div>
+  <div class="card" style="padding:16px 18px;margin:0">
+    <div style="font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;font-weight:600">Pending</div>
+    <div style="font-size:1.5rem;font-weight:800;font-family:'Plus Jakarta Sans',sans-serif;color:var(--warn);margin-top:4px" id="srStatPending">—</div>
+  </div>
+  <div class="card" style="padding:16px 18px;margin:0">
+    <div style="font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;font-weight:600">Approved</div>
+    <div style="font-size:1.5rem;font-weight:800;font-family:'Plus Jakarta Sans',sans-serif;color:var(--accent);margin-top:4px" id="srStatApproved">—</div>
+  </div>
+  <div class="card" style="padding:16px 18px;margin:0">
+    <div style="font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;font-weight:600">Total Refund Value</div>
+    <div style="font-size:1.1rem;font-weight:800;font-family:'Plus Jakarta Sans',sans-serif;color:#ef4444;margin-top:4px" id="srStatValue">—</div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header" style="flex-wrap:wrap;gap:10px">
+    <div style="display:flex;align-items:center;gap:12px">
+      <div class="card-title">Sales Returns</div>
+      <span id="srCount" class="badge badge-blue">—</span>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+      <div style="position:relative">
+        <i class="fas fa-search" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:.8rem"></i>
+        <input type="text" id="srSearch" class="form-control" placeholder="Search SO #, customer…" style="padding-left:32px;width:200px" oninput="debSR()"/>
+      </div>
+      <select class="form-control" id="srStatusFilter" style="width:140px" onchange="loadSRs()">
+        <option value="">All Statuses</option>
+        <option value="Pending">Pending</option>
+        <option value="Approved">Approved</option>
+        <option value="Rejected">Rejected</option>
+      </select>
+      <button class="btn btn-primary" onclick="openAddSRModal()"><i class="fas fa-plus"></i> New Return</button>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>#</th><th>Return #</th><th>SO #</th><th>Customer</th><th>Site</th><th>Reason</th><th>Refund</th><th>Date</th><th>Status</th><th>Actions</th></tr></thead>
+      <tbody id="srTbody"><tr><td colspan="10" style="text-align:center;padding:32px"><span class="spinner"></span></td></tr></tbody>
+    </table>
+  </div>
+  <div id="srPag" style="display:flex;align-items:center;justify-content:space-between;padding:14px 0 0;font-size:.82rem;color:var(--muted)"></div>
+</div>
+
+<!-- ADD RETURN MODAL -->
+<div class="modal-overlay" id="addSRModal">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-header">
+      <div class="modal-title"><i class="fas fa-rotate-left" style="color:var(--accent)"></i>New Sales Return</div>
+      <span class="modal-close" onclick="closeModal('addSRModal')"><i class="fas fa-times"></i></span>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group">
+          <label class="form-label">Sales Order # <span style="color:var(--danger)">*</span></label>
+          <select class="form-control" id="srSONum" onchange="onSOSelect(this.value)" style="width:100%">
+            <option value="">— Select Sales Order —</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Return Reason <span style="color:var(--danger)">*</span></label>
+          <select class="form-control" id="srReason">
+            <option value="Defective Product">Defective Product</option>
+            <option value="Wrong Item Delivered">Wrong Item Delivered</option>
+            <option value="Customer Changed Mind">Customer Changed Mind</option>
+            <option value="Damaged in Transit">Damaged in Transit</option>
+            <option value="Expired Product">Expired Product</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group" style="margin-top:10px">
+        <label class="form-label">Items to Return</label>
+        <div id="srItemsList" style="border:1px solid var(--border);border-radius:10px;overflow:hidden">
+          <div style="padding:12px;text-align:center;color:var(--muted);font-size:.82rem">Select a Sales Order to load items</div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Notes</label>
+        <textarea class="form-control" id="srNotes" rows="2" placeholder="Additional notes…"></textarea>
+      </div>
+      <div style="background:var(--surface2);border-radius:10px;padding:12px 16px;border:1px solid var(--border);margin-top:8px">
+        <div style="font-size:.72rem;color:var(--muted);margin-bottom:4px">ESTIMATED REFUND</div>
+        <div style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:1.2rem;color:var(--accent)" id="srRefundPreview">₹0.00</div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('addSRModal')">Cancel</button>
+      <button class="btn btn-primary" id="saveSRBtn" onclick="saveSR()"><i class="fas fa-save"></i> Submit Return</button>
+    </div>
+  </div>
+</div>
+
+<!-- VIEW RETURN MODAL -->
+<div class="modal-overlay" id="viewSRModal">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-header">
+      <div class="modal-title"><i class="fas fa-eye" style="color:var(--accent)"></i>Return Details</div>
+      <span class="modal-close" onclick="closeModal('viewSRModal')"><i class="fas fa-times"></i></span>
+    </div>
+    <div class="modal-body" id="viewSRBody"></div>
+    <div class="modal-footer" id="viewSRFooter">
+      <button class="btn btn-ghost" onclick="closeModal('viewSRModal')">Close</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let srPage=1, srTimer=null, srData=[], srSOItems=[], currentViewSR=null, allSOs=[];
+function debSR(){clearTimeout(srTimer);srTimer=setTimeout(()=>loadSRs(1),350);}
+function fmtR(n){n=Number(n)||0;if(n>=1e5)return'₹'+(n/1e5).toFixed(1)+'L';if(n>=1e3)return'₹'+(n/1e3).toFixed(1)+'K';return'₹'+n.toFixed(2);}
+
+async function loadAllSOs(){
+  const{ok,data}=await apiFetch('/admin/api/sales-orders');
+  if(!ok)return;
+  allSOs=(data.orders||[]).filter(o=>o.status==='Delivered'||o.status==='Dispatched'||o.status==='Confirmed');
+  const sel=document.getElementById('srSONum');
+  if(!sel)return;
+  sel.innerHTML='<option value="">— Select Sales Order —</option>'+
+    allSOs.map(o=>`<option value="${o.so_number}">${o.so_number} — ${o.customer||'—'} (${o.site||o.status||'—'})</option>`).join('');
+}
+
+async function onSOSelect(soNum){
+  document.getElementById('srItemsList').innerHTML='<div style="padding:12px;text-align:center;color:var(--muted);font-size:.82rem"><span class="spinner"></span> Loading items…</div>';
+  srSOItems=[];
+  document.getElementById('srRefundPreview').textContent='₹0.00';
+  if(!soNum){document.getElementById('srItemsList').innerHTML='<div style="padding:12px;text-align:center;color:var(--muted);font-size:.82rem">Select a Sales Order to load items</div>';return;}
+  const so=allSOs.find(o=>o.so_number===soNum);
+  if(!so){
+    // Fallback: fetch from API
+    const{ok,data}=await apiFetch(`/admin/api/sales-orders?so_number=${encodeURIComponent(soNum)}`);
+    const found=ok&&data.orders?data.orders.find(o=>o.so_number===soNum):null;
+    if(!found){document.getElementById('srItemsList').innerHTML='<div style="padding:12px;text-align:center;color:var(--danger);font-size:.82rem">Sales Order not found</div>';return;}
+    srSOItems=(found.items||[{product_name:found.product_name||'—',product_id:found.product_id||'',quantity:found.quantity||1,unit_price:found.unit_price||0}]).map(item=>({...item,return_qty:item.quantity||1}));
+  } else {
+    srSOItems=(so.items||[{product_name:so.product_name||'—',product_id:so.product_id||'',quantity:so.quantity||1,unit_price:so.unit_price||0}]).map(item=>({...item,return_qty:item.quantity||1}));
+  }
+  renderSRItems();
+}
+
+(async()=>{
+  await loadSRs();
+  await loadAllSOs();
+  // Auto-open modal if ?so= param present
+  const so=new URLSearchParams(window.location.search).get('so');
+  if(so){openAddSRModal();document.getElementById('srSONum').value=so;await onSOSelect(so);}
+})();
+
+async function loadSRs(page=1){
+  srPage=page;
+  const q=document.getElementById('srSearch').value.trim();
+  const status=document.getElementById('srStatusFilter').value;
+  const{ok,data}=await apiFetch(`/admin/api/sales-returns?page=${page}&q=${encodeURIComponent(q)}&status=${encodeURIComponent(status)}`);
+  if(!ok)return;
+  srData=data.returns||[];
+  document.getElementById('srCount').textContent=data.total||0;
+  // Stats from API
+  if (data.stats) {
+    document.getElementById('srStatTotal').textContent=data.stats.total_returns||0;
+    document.getElementById('srStatPending').textContent=data.stats.pending||0;
+    document.getElementById('srStatApproved').textContent=data.stats.approved||0;
+    document.getElementById('srStatValue').textContent=fmtR(data.stats.total_refund||0);
+  }
+  const tbody=document.getElementById('srTbody');
+  if(!srData.length){tbody.innerHTML='<tr><td colspan="10"><div class="empty-state"><i class="fas fa-rotate-left"></i><p>No sales returns found</p></div></td></tr>';document.getElementById('srPag').innerHTML='';return;}
+  const SC={Pending:'badge-warn',Approved:'badge-green',Rejected:'badge-red'};
+  tbody.innerHTML=srData.map((r,i)=>`<tr>
+    <td style="color:var(--muted)">${(page-1)*20+i+1}</td>
+    <td><span style="font-family:monospace;font-weight:700;color:var(--accent)">${r.return_number||'—'}</span></td>
+    <td style="font-weight:600">${r.so_number||'—'}</td>
+    <td>${r.customer||'—'}</td>
+    <td><span class="badge badge-blue" style="font-size:.7rem">${r.site||'—'}</span></td>
+    <td style="font-size:.8rem;color:var(--muted);max-width:120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.return_reason||'—'}</td>
+    <td style="font-weight:700;color:#ef4444">${fmtR(r.total_refund||0)}</td>
+    <td style="color:var(--muted);font-size:.8rem">${r.created_at||'—'}</td>
+    <td><span class="badge ${SC[r.status]||'badge-blue'}">${r.status||'—'}</span></td>
+    <td>
+      <div style="display:flex;gap:5px">
+        <button class="btn btn-ghost btn-sm btn-icon" onclick="viewSR(${i})" title="View"><i class="fas fa-eye" style="color:var(--accent)"></i></button>
+        ${r.status==='Pending'?`<button class="btn btn-ghost btn-sm btn-icon" onclick="approveSR('${r.return_number}')" title="Approve"><i class="fas fa-check" style="color:var(--accent)"></i></button>
+        <button class="btn btn-ghost btn-sm btn-icon" onclick="rejectSR('${r.return_number}')" title="Reject"><i class="fas fa-times" style="color:var(--danger)"></i></button>`:''}
+      </div>
+    </td>
+  </tr>`).join('');
+  renderPag('srPag',page,data.total,20,'loadSRs');
+}
+
+function openAddSRModal(){
+  document.getElementById('srSONum').value='';
+  document.getElementById('srNotes').value='';
+  document.getElementById('srItemsList').innerHTML='<div style="padding:12px;text-align:center;color:var(--muted);font-size:.82rem">Select a Sales Order to load items</div>';
+  document.getElementById('srRefundPreview').textContent='₹0.00';
+  srSOItems=[];
+  loadAllSOs();
+  openModal('addSRModal');
+}
+
+async function fetchSOItems(){
+  // Legacy - now handled by onSOSelect dropdown
+  const soNum=document.getElementById('srSONum').value.trim();
+  await onSOSelect(soNum);
+}
+
+function renderSRItems(){
+  if(!srSOItems.length){document.getElementById('srItemsList').innerHTML='<div style="padding:12px;text-align:center;color:var(--muted);font-size:.82rem">No items found</div>';return;}
+  let refund=0;
+  document.getElementById('srItemsList').innerHTML=`
+    <div style="padding:10px 14px;background:var(--surface2);border-bottom:1px solid var(--border);font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;display:grid;grid-template-columns:1fr 80px 80px 90px;gap:8px">
+      <div>Product</div><div style="text-align:center">Available</div><div style="text-align:center">Return Qty</div><div style="text-align:right">Refund</div>
+    </div>`+
+    srSOItems.map((item,i)=>{
+      const rp=Number(item.unit_price||0)*Number(item.return_qty||0);
+      refund+=rp;
+      return `<div style="padding:10px 14px;border-bottom:1px solid var(--border);display:grid;grid-template-columns:1fr 80px 80px 90px;gap:8px;align-items:center">
+        <div style="font-size:.83rem;font-weight:600">${item.product_name||item.product_id||'—'}</div>
+        <div style="text-align:center;font-size:.83rem;color:var(--muted)">${item.quantity||0}</div>
+        <div style="text-align:center"><input type="number" min="0" max="${item.quantity||99}" value="${item.return_qty||0}" style="width:58px;padding:4px 6px;border:1px solid var(--border);border-radius:7px;text-align:center;font-size:.83rem" oninput="updateSRQty(${i},this.value)"/></div>
+        <div style="text-align:right;font-weight:700;color:#ef4444;font-size:.83rem">₹${rp.toFixed(2)}</div>
+      </div>`;
+    }).join('');
+  document.getElementById('srRefundPreview').textContent=fmtR(refund);
+}
+
+function updateSRQty(i,val){
+  srSOItems[i].return_qty=Math.max(0,Math.min(Number(val),srSOItems[i].quantity||99));
+  renderSRItems();
+}
+
+async function saveSR(){
+  const soNum=document.getElementById('srSONum').value.trim();
+  const reason=document.getElementById('srReason').value;
+  if(!soNum){showToast('SO Number required','error');return;}
+  const items=srSOItems.filter(i=>i.return_qty>0).map(i=>({product_id:i.product_id,product_name:i.product_name,quantity:i.return_qty,unit_price:i.unit_price||0}));
+  if(!items.length){showToast('Add at least one return item','error');return;}
+  const btn=document.getElementById('saveSRBtn');
+  btn.disabled=true;btn.innerHTML='<span class="spinner"></span> Saving…';
+  try{
+    const{ok,data}=await apiFetch('/admin/api/sales-returns',{method:'POST',body:JSON.stringify({so_number:soNum,return_reason:reason,items,notes:document.getElementById('srNotes').value})});
+    if(ok&&data.status==='success'){closeModal('addSRModal');await loadSRs(1);showToast('Return submitted: '+data.return_number,'success');}
+    else showToast(data.message||'Failed','error');
+  }catch(e){showToast('Error','error');}
+  finally{btn.disabled=false;btn.innerHTML='<i class="fas fa-save"></i> Submit Return';}
+}
+
+function viewSR(i){
+  const r=srData[i];if(!r)return;currentViewSR=r;
+  const SC={Pending:'var(--warn)',Approved:'var(--accent)',Rejected:'var(--danger)'};
+  const items=Array.isArray(r.items)?r.items:[];
+  document.getElementById('viewSRBody').innerHTML=`
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div style="background:linear-gradient(135deg,#7f1d1d,#991b1b);border-radius:14px;padding:16px 20px;color:#fff;display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-size:.7rem;opacity:.7;margin-bottom:4px">SALES RETURN</div>
+          <div style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:1rem">${r.return_number}</div>
+          <div style="font-size:.75rem;opacity:.75;margin-top:3px">SO: ${r.so_number} · ${r.customer||'—'}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:.65rem;opacity:.7">Refund Amount</div>
+          <div style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:1.4rem">₹${Number(r.total_refund||0).toLocaleString('en-IN',{minimumFractionDigits:2})}</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="view-field"><div class="view-label">Status</div><div class="view-value" style="color:${SC[r.status]||'var(--text)'}">${r.status||'—'}</div></div>
+        <div class="view-field"><div class="view-label">Site</div><div class="view-value">${r.site||'—'}</div></div>
+        <div class="view-field"><div class="view-label">Return Reason</div><div class="view-value" style="font-size:.85rem">${r.return_reason||'—'}</div></div>
+        <div class="view-field"><div class="view-label">Created</div><div class="view-value">${r.created_at||'—'}</div></div>
+        ${r.approved_at?`<div class="view-field"><div class="view-label">Approved By</div><div class="view-value">${r.approved_by||'—'}</div></div><div class="view-field"><div class="view-label">Approved At</div><div class="view-value">${r.approved_at}</div></div>`:''}
+      </div>
+      ${items.length?`<div>
+        <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;color:var(--muted2);margin-bottom:8px">Returned Items</div>
+        ${items.map(it=>`<div style="display:flex;justify-content:space-between;padding:8px 12px;background:var(--surface2);border-radius:8px;margin-bottom:6px;font-size:.83rem">
+          <span style="font-weight:600">${it.product_name||it.product_id||'—'}</span>
+          <span>Qty: ${it.quantity||0} × ₹${Number(it.unit_price||0).toFixed(2)}</span>
+        </div>`).join('')}
+      </div>`:''}
+      ${r.notes?`<div class="view-field"><div class="view-label">Notes</div><div class="view-value" style="font-size:.83rem;white-space:pre-wrap">${r.notes}</div></div>`:''}
+    </div>`;
+  const footer=document.getElementById('viewSRFooter');
+  footer.innerHTML=`<button class="btn btn-ghost" onclick="closeModal('viewSRModal')">Close</button>
+    ${r.status==='Pending'?`<button class="btn btn-danger" onclick="rejectSR('${r.return_number}');closeModal('viewSRModal')">Reject</button>
+    <button class="btn btn-primary" onclick="approveSR('${r.return_number}');closeModal('viewSRModal')"><i class="fas fa-check"></i> Approve</button>`:''}`;
+  openModal('viewSRModal');
+}
+
+async function approveSR(rn){
+  // proceed
+  const{ok,data}=await apiFetch(`/admin/api/sales-returns/${rn}/approve`,{method:'POST'});
+  if(ok&&data.status==='success'){await loadSRs(srPage);showToast('Return approved','success');}
+  else showToast(data.message||'Failed','error');
+}
+
+async function rejectSR(rn){
+  // proceed
+  const{ok,data}=await apiFetch(`/admin/api/sales-returns/${rn}/reject`,{method:'POST'});
+  if(ok&&data.status==='success'){await loadSRs(srPage);showToast('Return rejected','success');}
+  else showToast(data.message||'Failed','error');
+}
+
+function openModal(id){document.getElementById(id).classList.add('open');}
+function closeModal(id){document.getElementById(id).classList.remove('open');}
+function renderPag(elId,page,total,pp,fn){
+  const pages=Math.ceil(total/pp);const el=document.getElementById(elId);
+  if(!el)return;
+  if(pages<=1){el.innerHTML=`<span style="font-size:.78rem;color:var(--muted)">${total} record${total!==1?'s':''}</span>`;return;}
+  let btns='',prev=null;
+  const delta=2,left=page-delta,right=page+delta+1;
+  for(let i=1;i<=pages;i++){if(i===1||i===pages||(i>=left&&i<right)){if(prev&&i-prev>1)btns+=`<span class="page-btn disabled">…</span>`;btns+=`<a class="page-btn${i===page?' active':''}" onclick="${fn}(${i})">${i}</a>`;prev=i;}}
+  const start=(page-1)*pp+1,end=Math.min(page*pp,total);
+  el.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:10px 0 2px">
+    <span style="font-size:.78rem;color:var(--muted)">Showing <strong>${start}–${end}</strong> of <strong>${total}</strong></span>
+    <div style="display:flex;gap:4px">
+      <button class="page-btn${page===1?' disabled':''}" onclick="${fn}(${page-1})" ${page===1?'disabled':''}><i class="fas fa-chevron-left" style="font-size:.6rem"></i></button>
+      ${btns}
+      <button class="page-btn${page===pages?' disabled':''}" onclick="${fn}(${page+1})" ${page===pages?'disabled':''}><i class="fas fa-chevron-right" style="font-size:.6rem"></i></button>
+    </div>
+  </div>`;
+}
+</script>
+{% endblock %}

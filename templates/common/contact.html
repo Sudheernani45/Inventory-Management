@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Contact — INVEXA</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/landing.css') }}"/>
+  <style>
+    .mobile-nav-btn{display:none;background:none;border:none;color:var(--text);font-size:1.3rem;cursor:pointer;padding:6px;}
+    @media(max-width:768px){.mobile-nav-btn{display:block;}.nav-links{display:none;position:absolute;top:60px;left:0;right:0;background:var(--surface);border-bottom:1px solid var(--border);flex-direction:column;padding:12px 20px;gap:4px;z-index:100;}.nav-links.open{display:flex;}}
+  </style>
+</head>
+<body>
+
+<nav class="public-nav">
+  <a href="{{ url_for('common.home') }}" class="nav-brand">
+    <div class="logo-box"><i class="fas fa-boxes-stacked" style="color:#1a3a2a;font-size:13px"></i></div>
+    <span class="brand-name">INVEXA</span>
+  </a>
+  <ul class="nav-links" id="navLinks">
+    <li><a href="{{ url_for('common.home') }}">Home</a></li>
+    <li><a href="{{ url_for('common.about') }}">About</a></li>
+    <li><a href="{{ url_for('common.features') }}">Features</a></li>
+    <li><a href="{{ url_for('common.contact') }}" class="active">Contact</a></li>
+  </ul>
+  <div class="nav-cta">
+    <button class="mobile-nav-btn" id="mobileNavBtn" aria-label="Toggle menu"><i class="fas fa-bars"></i></button>
+    {% if session.get('role') %}
+      <div class="nav-user-pill">
+        <div class="nav-user-avatar">{{ session.get('username','U')[0].upper() }}</div>
+        <span class="nav-user-name">{{ session.get('username','User') }}</span>
+      </div>
+      {% if session.get('role') == 'admin' %}
+        <a href="/admin/dashboard" class="nav-portal-badge"><span class="nav-portal-dot"></span>Admin Portal</a>
+      {% elif session.get('role') == 'analyst' %}
+        <a href="/analyst/dashboard" class="nav-portal-badge analyst"><span class="nav-portal-dot"></span>Analytics Portal</a>
+      {% else %}
+        <a href="/manager/dashboard" class="nav-portal-badge"><span class="nav-portal-dot"></span>Manager Portal</a>
+      {% endif %}
+      <a href="/logout" class="btn-nav-login" style="background:rgba(239,68,68,.12);color:#ef4444;border:1px solid rgba(239,68,68,.2)"><i class="fas fa-arrow-right-from-bracket"></i> Sign Out</a>
+    {% else %}
+      <a href="{{ url_for('auth.login') }}" class="btn-nav-login"><i class="fas fa-arrow-right-to-bracket"></i> Sign In</a>
+    {% endif %}
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero" style="min-height:45vh;padding:70px 48px 50px">
+  <div class="hero-grid-bg"></div>
+  <div class="hero-glow"></div>
+  <div class="hero-inner">
+    <div class="hero-badge"><span class="badge-dot"></span>Get In Touch</div>
+    <h1 class="hero-title">We'd love to hear<br/><span class="highlight">from you</span></h1>
+    <p class="hero-desc">Questions, demos, or technical support — our team typically responds within 24 hours.</p>
+  </div>
+</section>
+
+<!-- CONTACT -->
+<section class="section">
+  <div class="section-inner">
+    <div class="contact-grid">
+      <div>
+        <h2 class="section-title" style="margin-bottom:10px">Contact Information</h2>
+        <p class="section-desc" style="margin-bottom:28px">Reach out for sales inquiries, technical support, or to schedule a live demo.</p>
+
+        <div class="contact-info-item">
+          <div class="contact-info-icon"><i class="fas fa-envelope"></i></div>
+          <div><div class="contact-info-label">Email</div><div class="contact-info-value">support@ifms.app</div></div>
+        </div>
+        <div class="contact-info-item">
+          <div class="contact-info-icon"><i class="fas fa-phone"></i></div>
+          <div><div class="contact-info-label">Phone</div><div class="contact-info-value">+91 98765 43210</div></div>
+        </div>
+        <div class="contact-info-item">
+          <div class="contact-info-icon"><i class="fas fa-clock"></i></div>
+          <div><div class="contact-info-label">Response Time</div><div class="contact-info-value">Within 24 hours</div></div>
+        </div>
+        <div class="contact-info-item">
+          <div class="contact-info-icon"><i class="fas fa-map-marker-alt"></i></div>
+          <div><div class="contact-info-label">Location</div><div class="contact-info-value">Kurnool, Andhra Pradesh, India</div></div>
+        </div>
+
+        <div style="margin-top:28px;padding:20px;background:var(--surface);border:1px solid var(--border);border-radius:12px">
+          <div style="font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--muted2);margin-bottom:14px">Platform Status</div>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div style="display:flex;justify-content:space-between;align-items:center;font-size:.82rem">
+              <span style="color:var(--muted)">Platform Uptime</span>
+              <span style="color:#22c55e;font-weight:800">99.9% ●</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;font-size:.82rem">
+              <span style="color:var(--muted)">Active Sites</span>
+              <span style="font-weight:600;color:var(--text)" id="csSites">—</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;font-size:.82rem">
+              <span style="color:var(--muted)">Registered Users</span>
+              <span style="font-weight:600;color:var(--text)" id="csUsers">—</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;font-size:.82rem">
+              <span style="color:var(--muted)">Products Tracked</span>
+              <span style="font-weight:600;color:var(--text)" id="csProducts">—</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Redesigned Premium Contact Form -->
+      <div class="contact-form-card">
+        <!-- Form header -->
+        <div style="display:flex;align-items:center;gap:14px;margin-bottom:26px;padding-bottom:20px;border-bottom:1px solid var(--border)">
+          <div style="width:44px;height:44px;border-radius:12px;background:var(--teal-lt);display:flex;align-items:center;justify-content:center;color:var(--teal);font-size:1rem;flex-shrink:0"><i class="fas fa-paper-plane"></i></div>
+          <div>
+            <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:1.05rem;font-weight:900;color:var(--text)">Send us a message</div>
+            <div style="font-size:.78rem;color:var(--muted);margin-top:2px">We respond within 24 hours on business days</div>
+          </div>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}{% for category, message in messages %}
+            <div class="flash {{ category }}" style="margin-bottom:18px">
+              <i class="fas {{ 'fa-circle-check' if category == 'success' else 'fa-circle-exclamation' }}"></i>
+              {{ message }}
+            </div>
+          {% endfor %}{% endif %}
+        {% endwith %}
+
+        <form id="contactForm" action="{{ url_for('common.contact') }}" method="POST">
+          <!-- Name + Email row -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+            <div class="contact-form-field">
+              <label class="contact-field-label">Full Name <span style="color:var(--danger)">*</span></label>
+              <div style="position:relative">
+                <i class="fas fa-user" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--muted2);font-size:.8rem;pointer-events:none"></i>
+                <input type="text" name="name" class="contact-field-input" placeholder="John Smith" required style="padding-left:34px"/>
+              </div>
+            </div>
+            <div class="contact-form-field">
+              <label class="contact-field-label">Email Address <span style="color:var(--danger)">*</span></label>
+              <div style="position:relative">
+                <i class="fas fa-envelope" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--muted2);font-size:.8rem;pointer-events:none"></i>
+                <input type="email" name="email" class="contact-field-input" placeholder="you@site.com" required style="padding-left:34px"/>
+              </div>
+            </div>
+          </div>
+
+          <!-- Company row -->
+          <div class="contact-form-field" style="margin-bottom:14px">
+            <label class="contact-field-label">Site <span style="color:var(--muted2);font-weight:500;text-transform:none;letter-spacing:0">(optional)</span></label>
+            <div style="position:relative">
+              <i class="fas fa-building" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--muted2);font-size:.8rem;pointer-events:none"></i>
+              <input type="text" name="company" class="contact-field-input" placeholder="Your site name" style="padding-left:34px"/>
+            </div>
+          </div>
+
+          <!-- Subject selector — styled pill tabs -->
+        <!--  <div class="contact-form-field" style="margin-bottom:14px">
+            <label class="contact-field-label">How can we help?</label>
+            <div style="display:flex;flex-wrap:wrap;gap:8px" id="subjectPills">
+              <input type="hidden" name="subject" id="subjectVal" value="Request Access"/>
+              <button type="button" class="subject-pill active" onclick="setPill(this,'Request Access')">Request Access</button>
+              <button type="button" class="subject-pill" onclick="setPill(this,'Schedule a Demo')">Schedule a Demo</button>
+              <button type="button" class="subject-pill" onclick="setPill(this,'Technical Support')">Technical Support</button>
+              <button type="button" class="subject-pill" onclick="setPill(this,'General Inquiry')">General Inquiry</button>
+            </div>
+          </div> -->
+
+          <!-- Message textarea -->
+          <div class="contact-form-field" style="margin-bottom:22px">
+            <label class="contact-field-label">Message <span style="color:var(--danger)">*</span></label>
+            <textarea name="message" class="contact-field-input" placeholder="Tell us how we can help… describe your needs or question in detail." required style="min-height:110px;resize:vertical;padding-top:11px;padding-bottom:11px"></textarea>
+          </div>
+
+          <!-- Submit row -->
+          <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+            <button type="submit" class="btn-contact" style="flex:1;min-width:180px">
+              <i class="fas fa-paper-plane"></i> Send Message
+            </button>
+            <div style="font-size:.74rem;color:var(--muted2);display:flex;align-items:center;gap:5px">
+              <i class="fas fa-lock" style="font-size:.7rem;color:var(--teal)"></i>
+              Your data is private &amp; secure
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer class="site-footer">
+  <div class="footer-grid">
+    <div>
+      <div class="footer-brand-name"><i class="fas fa-boxes-stacked" style="color:var(--accent)"></i>INVEXA</div>
+      <p class="footer-desc">INVEXA.</p>
+    </div>
+    <div class="footer-col"><div class="footer-col-title">Product</div><a href="{{ url_for('common.features') }}">Features</a><a href="#">Pricing</a></div>
+    <div class="footer-col"><div class="footer-col-title">Company</div><a href="{{ url_for('common.about') }}">About</a><a href="{{ url_for('common.contact') }}">Contact</a></div>
+    <div class="footer-col"><div class="footer-col-title">Support</div><a href="#">Help Centre</a><a href="#">Privacy Policy</a></div>
+  </div>
+  <div class="footer-bottom"><span>© 2025 INVEXA. All rights reserved.</span></div>
+</footer>
+
+<script>
+(function(){
+  const btn=document.getElementById('mobileNavBtn');
+  const links=document.querySelector('.nav-links');
+  if(btn&&links) btn.addEventListener('click',()=>links.classList.toggle('open'));
+})();
+
+function setPill(el,val){
+  document.querySelectorAll('.subject-pill').forEach(p=>p.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('subjectVal').value=val;
+}
+
+// Realtime stats
+async function refreshContactStats(){
+  try{
+    const r=await fetch('/api/platform-stats');
+    if(!r.ok) return;
+    const d=await r.json();
+    const map={'cProducts':d.products,'cSites':d.sites,'cUsers':d.users,'cInventory':d.inventory};
+    Object.entries(map).forEach(([id,val])=>{
+      const el=document.getElementById(id);
+      if(el) el.textContent=(val||0).toLocaleString();
+    });
+  }catch(e){}
+}
+setInterval(refreshContactStats,60000);
+refreshContactStats();
+
+</script>
+</body>
+</html>

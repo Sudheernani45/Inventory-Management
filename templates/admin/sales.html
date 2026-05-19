@@ -1,0 +1,160 @@
+{% extends "admin/base.html" %}
+{% block title %}Sales{% endblock %}
+{% block page_title %}<i class="fas fa-chart-line" style="color:var(--accent);margin-right:8px"></i>Sales{% endblock %}
+
+{% block content %}
+<div id="salesSummary" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:24px"></div>
+
+<div class="card">
+  <div class="card-header" style="flex-wrap:wrap;gap:10px">
+    <div style="display:flex;align-items:center;gap:12px">
+      <div class="card-title">Sales Records</div>
+      <span id="salesCount" class="badge badge-blue">—</span>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <div style="position:relative">
+        <i class="fas fa-search" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:.8rem"></i>
+        <input type="text" id="salesSearch" class="form-control" placeholder="Search product…" style="padding-left:32px;width:170px" oninput="debounceSales()"/>
+      </div>
+      <select class="form-control" id="salesSiteFilter" style="width:170px" onchange="loadSales()">
+        <option value="">All Sites</option>
+      </select>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>#</th><th>Product</th><th>Site</th><th>Units Sold</th><th>Revenue</th><th>Returns</th><th>Discounts</th><th>Date</th><th>Actions</th></tr></thead>
+      <tbody id="salesTbody"><tr><td colspan="9" style="text-align:center;padding:32px"><span class="spinner"></span></td></tr></tbody>
+    </table>
+  </div>
+  <div id="salesPagination" style="display:flex;align-items:center;justify-content:space-between;padding:14px 0 0;font-size:.82rem;color:var(--muted)"></div>
+</div>
+
+<!-- VIEW SALE MODAL -->
+<div class="modal-overlay" id="viewSaleModal">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-header">
+      <div class="modal-title"><i class="fas fa-eye" style="color:var(--accent)"></i>Sale Details</div>
+      <span class="modal-close" onclick="closeModal('viewSaleModal')"><i class="fas fa-times"></i></span>
+    </div>
+    <div class="modal-body" id="viewSaleBody"></div>
+    <div class="modal-footer"><button class="btn btn-ghost" onclick="closeModal('viewSaleModal')">Close</button></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let salesRecords = [];
+let salesTimer = null;
+function debounceSales(){ clearTimeout(salesTimer); salesTimer=setTimeout(()=>loadSales(1),350); }
+
+(function(){ loadSiteFilter().then(()=>loadSales()); })(); // FIX 5: non-blocking
+
+async function loadSiteFilter() {
+  try {
+    const { ok, data } = await apiFetch('/api/sites-list'); if (!ok) return;
+    document.getElementById('salesSiteFilter').innerHTML =
+      '<option value="">All Sites</option>' + data.sites.map(s => `<option value="${s.site_id}">${s.site_name}</option>`).join('');
+  } catch(e) {}
+}
+
+async function loadSales(page = 1) {
+  const site = document.getElementById('salesSiteFilter').value;
+  const q    = document.getElementById('salesSearch').value.trim();
+  try {
+    const { ok, data } = await apiFetch(`/admin/sales/list?page=${page}&site_id=${site}&q=${encodeURIComponent(q)}`); if (!ok) return;
+    salesRecords = data.records || [];
+    document.getElementById('salesCount').textContent = data.total || 0;
+    if (data.summary) {
+      document.getElementById('salesSummary').innerHTML = `
+        <div class="stat-card blue"><div class="stat-icon"><i class="fas fa-indian-rupee-sign"></i></div><div><div class="stat-label">Total Revenue</div><div class="stat-value">₹${Number(data.summary.total_revenue||0).toLocaleString('en-IN',{maximumFractionDigits:0})}</div></div></div>
+        <div class="stat-card green"><div class="stat-icon"><i class="fas fa-cart-shopping"></i></div><div><div class="stat-label">Units Sold</div><div class="stat-value">${Number(data.summary.total_units||0).toLocaleString()}</div></div></div>
+        <div class="stat-card red"><div class="stat-icon"><i class="fas fa-rotate-left"></i></div><div><div class="stat-label">Returns</div><div class="stat-value">${Number(data.summary.total_returns||0).toLocaleString()}</div></div></div>
+        <div class="stat-card yellow"><div class="stat-icon"><i class="fas fa-tag"></i></div><div><div class="stat-label">Discounts</div><div class="stat-value">₹${Number(data.summary.total_discounts||0).toLocaleString('en-IN',{maximumFractionDigits:0})}</div></div></div>`;
+    }
+    const tbody = document.getElementById('salesTbody');
+    if (!salesRecords.length) { tbody.innerHTML = '<tr><td colspan="9"><div class="empty-state"><i class="fas fa-chart-line"></i><p>No sales records</p></div></td></tr>'; return; }
+    tbody.innerHTML = salesRecords.map((r, i) => `<tr>
+      <td style="color:var(--muted)">${(page-1)*20+i+1}</td>
+      <td style="font-weight:500">${r.product_name || '—'}</td>
+      <td style="color:var(--muted)">${r.site_name || '—'}</td>
+      <td style="font-weight:600">${Number(r.units_sold||0).toLocaleString()}</td>
+      <td style="color:var(--accent3);font-weight:600">₹${Number(r.revenue||0).toLocaleString('en-IN',{maximumFractionDigits:0})}</td>
+      <td style="color:var(--danger)">${Number(r.returns||0).toLocaleString()}</td>
+      <td style="color:var(--muted)">₹${Number(r.discounts||0).toLocaleString('en-IN',{maximumFractionDigits:0})}</td>
+      <td style="color:var(--muted);font-size:.78rem">${r.date || '—'}</td>
+      <td>
+        <button class="btn btn-ghost btn-sm btn-icon" onclick="viewSale(${(page-1)*20+i})" title="View">
+          <i class="fas fa-eye" style="color:var(--accent)"></i>
+        </button>
+      </td>
+    </tr>`).join('');
+    renderPag('salesPagination', page, data.total, 20, 'loadSales');
+  } catch(e) { showToast('Error', 'error'); }
+}
+
+function viewSale(idx) {
+  const r = salesRecords[idx]; if (!r) return;
+  document.getElementById('viewSaleBody').innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <!-- Hero -->
+      <div style="background:linear-gradient(135deg,#1e3a5f 0%,#1a6b8a 100%);border-radius:14px;padding:18px 20px;display:flex;align-items:center;gap:14px">
+        <div style="width:48px;height:48px;border-radius:13px;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;color:#fff;font-size:1.2rem;flex-shrink:0">
+          <i class="fas fa-chart-line"></i>
+        </div>
+        <div style="flex:1;min-width:0">
+          <div style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;color:#fff;font-size:.98rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.product_name || '—'}</div>
+          <div style="color:rgba(255,255,255,.65);font-size:.76rem;margin-top:2px">${r.site_name||'—'} · ${r.date||'—'}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;color:#fff;font-size:1.2rem">₹${Number(r.revenue||0).toLocaleString('en-IN',{maximumFractionDigits:0})}</div>
+          <div style="color:rgba(255,255,255,.6);font-size:.7rem">Revenue</div>
+        </div>
+      </div>
+      <!-- Stats grid -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="view-field">
+          <div class="view-label">Units Sold</div>
+          <div class="view-value" style="font-size:1.1rem">${Number(r.units_sold||0).toLocaleString()}</div>
+        </div>
+        <div class="view-field">
+          <div class="view-label">Returns</div>
+          <div class="view-value danger">${Number(r.returns||0).toLocaleString()}</div>
+        </div>
+        <div class="view-field" style="grid-column:1/-1">
+          <div class="view-label">Discounts Applied</div>
+          <div class="view-value">₹${Number(r.discounts||0).toLocaleString('en-IN',{maximumFractionDigits:0})}</div>
+        </div>
+      </div>
+    </div>`;
+  openModal('viewSaleModal');
+}
+
+function renderPag(elId, page, total, pp, fn) {
+  const pages=Math.ceil(total/pp); const el=document.getElementById(elId);
+  if(!el) return;
+  if(pages<=1){el.innerHTML=`<span style="font-size:.78rem;color:var(--muted)">${total} record${total!==1?'s':''}</span>`;return;}
+  const delta=2; let range=[],left=page-delta,right=page+delta+1,prev=null;
+  for(let i=1;i<=pages;i++){if(i===1||i===pages||(i>=left&&i<right))range.push(i);}
+  let btns='';
+  range.forEach(i=>{
+    if(prev&&i-prev>1)btns+=`<span class="page-btn disabled" style="border:none;background:none;color:var(--muted)">…</span>`;
+    btns+=`<a class="page-btn${i===page?' active':''}" onclick="${fn}(${i})">${i}</a>`;
+    prev=i;
+  });
+  const start=(page-1)*pp+1, end=Math.min(page*pp,total);
+  el.innerHTML=`
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:12px 0 2px">
+      <span style="font-size:.78rem;color:var(--muted)">Showing <strong style="color:var(--text)">${start}–${end}</strong> of <strong style="color:var(--text)">${total}</strong></span>
+      <div style="display:flex;align-items:center;gap:4px">
+        <button class="page-btn${page===1?' disabled':''}" onclick="${fn}(${page-1})" ${page===1?'disabled':''} title="Prev"><i class="fas fa-chevron-left" style="font-size:.6rem"></i></button>
+        ${btns}
+        <button class="page-btn${page===pages?' disabled':''}" onclick="${fn}(${page+1})" ${page===pages?'disabled':''} title="Next"><i class="fas fa-chevron-right" style="font-size:.6rem"></i></button>
+      </div>
+    </div>`;
+}
+function openModal(id)  { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+</script>
+{% endblock %}

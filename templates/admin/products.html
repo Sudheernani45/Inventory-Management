@@ -1,0 +1,529 @@
+{% extends "admin/base.html" %}
+{% block title %}Products{% endblock %}
+{% block page_title %}<i class="fas fa-boxes-stacked" style="color:var(--accent);margin-right:8px"></i>Products{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <div style="display:flex;align-items:center;gap:12px">
+      <div class="card-title">Product Catalog</div>
+      <span id="productCount" class="badge badge-blue">—</span>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <div class="product-search-wrap">
+        <div class="product-search-field">
+          <i class="fas fa-magnifying-glass search-icon"></i>
+          <input type="text" class="search-input" id="productSearch" placeholder="Search products…" oninput="searchProducts();toggleSearchClear(this)" autocomplete="off"/>
+          <button class="search-clear" onclick="clearProductSearch()" tabindex="-1" title="Clear"><i class="fas fa-xmark"></i></button>
+        </div>
+        <select class="product-cat-filter" id="catFilter" onchange="searchProducts()">
+          <option value="">All Categories</option>
+        </select>
+      </div>
+      <button class="btn btn-primary" onclick="openAddProductModal()">
+        <i class="fas fa-plus"></i> Add Product
+      </button>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Product ID</th><th>Product Name</th><th>Category</th><th>Unit Price</th><th>Actions</th></tr></thead>
+      <tbody id="productsTbody"><tr><td colspan="5" style="text-align:center;padding:32px"><span class="spinner"></span></td></tr></tbody>
+    </table>
+  </div>
+  <div id="productPagination" style="display:flex;align-items:center;justify-content:space-between;padding:14px 0 0;font-size:.82rem;color:var(--muted)"></div>
+</div>
+
+<!-- ADD PRODUCT MODAL -->
+<div class="modal-overlay" id="addProductModal">
+  <div class="modal" style="max-width:600px">
+    <div class="modal-header">
+      <div class="modal-title"><i class="fas fa-plus" style="color:var(--accent)"></i>Add Product</div>
+      <span class="modal-close" onclick="closeModal('addProductModal')"><i class="fas fa-times"></i></span>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group">
+          <label class="form-label">Product Name *</label>
+          <input type="text" class="form-control" id="apName" placeholder="Enter product name"/>
+        </div>
+
+        <!-- Category with inline + -->
+        <div class="form-group">
+          <label class="form-label">Category</label>
+          <div style="display:flex;gap:6px;align-items:center">
+            <select class="form-control" id="apCategory" onchange="loadSubcategoriesFor('apCategory','apSubcategory')" style="flex:1"></select>
+            <button type="button" onclick="openInstantModal('category')" title="Add new category" style="width:34px;height:38px;border-radius:8px;background:var(--accent);border:none;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:.9rem"><i class="fas fa-plus"></i></button>
+          </div>
+        </div>
+
+        <!-- Subcategory with inline + -->
+        <div class="form-group">
+          <label class="form-label">Subcategory</label>
+          <div style="display:flex;gap:6px;align-items:center">
+            <select class="form-control" id="apSubcategory" style="flex:1"><option value="">— Select Category First —</option></select>
+            <button type="button" onclick="openInstantModal('subcategory','apCategory')" title="Add new subcategory" style="width:34px;height:38px;border-radius:8px;background:var(--accent);border:none;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:.9rem"><i class="fas fa-plus"></i></button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Unit Cost (₹)</label>
+          <input type="number" class="form-control" id="apCost" placeholder="0.00" step="0.01"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Unit Price (₹)</label>
+          <input type="number" class="form-control" id="apPrice" placeholder="0.00" step="0.01"/>
+        </div>
+
+        <!-- Supplier with inline + -->
+        <div class="form-group">
+          <label class="form-label">Supplier</label>
+          <div style="display:flex;gap:6px;align-items:center">
+            <select class="form-control" id="apSupplier" style="flex:1"><option value="">— Select —</option></select>
+            <button type="button" onclick="openInstantModal('supplier')" title="Add new supplier" style="width:34px;height:38px;border-radius:8px;background:var(--accent);border:none;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:.9rem"><i class="fas fa-plus"></i></button>
+          </div>
+        </div>
+
+        <!-- Shelf Life dropdown by product type -->
+        <div class="form-group">
+          <label class="form-label">Shelf Life (by product type)</label>
+          <select class="form-control" id="apShelfLife" onchange="onShelfLifeChange('ap')">
+            <option value="">— Select range —</option>
+            <optgroup label="Perishables">
+              <option value="1">1 day (Fresh Produce / Dairy)</option>
+              <option value="3">2–3 days (Bakery / Deli)</option>
+              <option value="7">4–7 days (Chilled Meat / Fish)</option>
+              <option value="14">1–2 weeks (Processed Meat)</option>
+            </optgroup>
+            <optgroup label="Semi-Perishables">
+              <option value="30">~1 month (Dairy Products)</option>
+              <option value="90">1–3 months (Eggs / Soft Cheese)</option>
+              <option value="180">3–6 months (Frozen / Condiments)</option>
+            </optgroup>
+            <optgroup label="Non-Perishables">
+              <option value="365">~1 year (Canned / Dry Goods)</option>
+              <option value="730">1–2 years (Grains / Pasta)</option>
+              <option value="1825">2–5 years (Beverages / Sugar)</option>
+            </optgroup>
+            <optgroup label="Non-Food / Industrial">
+              <option value="3650">5–10 years (Packaging / Chemicals)</option>
+              <option value="0">No expiry (Equipment / Tools)</option>
+            </optgroup>
+            <option value="custom">Custom (enter days)</option>
+          </select>
+          <input type="number" class="form-control" id="apShelfLifeCustom" placeholder="Enter exact days" style="display:none;margin-top:6px"/>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('addProductModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveProduct()"><i class="fas fa-save"></i> Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- VIEW PRODUCT MODAL -->
+<div class="modal-overlay" id="viewProductModal">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-header">
+      <div class="modal-title"><i class="fas fa-eye" style="color:var(--accent)"></i>Product Details</div>
+      <span class="modal-close" onclick="closeModal('viewProductModal')"><i class="fas fa-times"></i></span>
+    </div>
+    <div class="modal-body" id="viewProductBody"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('viewProductModal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT PRODUCT MODAL -->
+<div class="modal-overlay" id="editProductModal">
+  <div class="modal" style="max-width:600px">
+    <div class="modal-header">
+      <div class="modal-title"><i class="fas fa-pen" style="color:var(--warn)"></i>Edit Product</div>
+      <span class="modal-close" onclick="closeModal('editProductModal')"><i class="fas fa-times"></i></span>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="epId"/>
+      <div class="form-grid">
+        <div class="form-group">
+          <label class="form-label">Product ID</label>
+          <input type="text" class="form-control" id="epProductId" readonly style="opacity:.6"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Product Name *</label>
+          <input type="text" class="form-control" id="epName"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Category</label>
+          <div style="display:flex;gap:6px;align-items:center">
+            <select class="form-control" id="epCategory" onchange="loadSubcategoriesFor('epCategory','epSubcategory')" style="flex:1"><option value="">— Select —</option></select>
+            <button type="button" onclick="openInstantModal('category')" title="Add new category" style="width:34px;height:38px;border-radius:8px;background:var(--accent);border:none;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:.9rem"><i class="fas fa-plus"></i></button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Subcategory</label>
+          <div style="display:flex;gap:6px;align-items:center">
+            <select class="form-control" id="epSubcategory" style="flex:1"><option value="">—</option></select>
+            <button type="button" onclick="openInstantModal('subcategory','epCategory')" title="Add new subcategory" style="width:34px;height:38px;border-radius:8px;background:var(--accent);border:none;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:.9rem"><i class="fas fa-plus"></i></button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Unit Cost (₹)</label>
+          <input type="number" class="form-control" id="epCost" step="0.01"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Unit Price (₹)</label>
+          <input type="number" class="form-control" id="epPrice" step="0.01"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Supplier</label>
+          <div style="display:flex;gap:6px;align-items:center">
+            <select class="form-control" id="epSupplier" style="flex:1"><option value="">—</option></select>
+            <button type="button" onclick="openInstantModal('supplier')" title="Add new supplier" style="width:34px;height:38px;border-radius:8px;background:var(--accent);border:none;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:.9rem"><i class="fas fa-plus"></i></button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Shelf Life (by product type)</label>
+          <select class="form-control" id="epShelfLife" onchange="onShelfLifeChange('ep')">
+            <option value="">— Select range —</option>
+            <optgroup label="Perishables">
+              <option value="1">1 day (Fresh Produce / Dairy)</option>
+              <option value="3">2–3 days (Bakery / Deli)</option>
+              <option value="7">4–7 days (Chilled Meat / Fish)</option>
+              <option value="14">1–2 weeks (Processed Meat)</option>
+            </optgroup>
+            <optgroup label="Semi-Perishables">
+              <option value="30">~1 month (Dairy Products)</option>
+              <option value="90">1–3 months (Eggs / Soft Cheese)</option>
+              <option value="180">3–6 months (Frozen / Condiments)</option>
+            </optgroup>
+            <optgroup label="Non-Perishables">
+              <option value="365">~1 year (Canned / Dry Goods)</option>
+              <option value="730">1–2 years (Grains / Pasta)</option>
+              <option value="1825">2–5 years (Beverages / Sugar)</option>
+            </optgroup>
+            <optgroup label="Non-Food / Industrial">
+              <option value="3650">5–10 years (Packaging / Chemicals)</option>
+              <option value="0">No expiry (Equipment / Tools)</option>
+            </optgroup>
+            <option value="custom">Custom (enter days)</option>
+          </select>
+          <input type="number" class="form-control" id="epShelfLifeCustom" placeholder="Enter exact days" style="display:none;margin-top:6px"/>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('editProductModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="updateProduct()"><i class="fas fa-save"></i> Update</button>
+    </div>
+  </div>
+</div>
+
+<!-- DELETE CONFIRM -->
+<div class="modal-overlay" id="delProductModal">
+  <div class="modal" style="max-width:400px">
+    <div class="modal-header"><div class="modal-title" style="color:var(--danger)"><i class="fas fa-trash"></i>Delete Product</div><span class="modal-close" onclick="closeModal('delProductModal')"><i class="fas fa-times"></i></span></div>
+    <div class="modal-body"><p style="color:var(--muted)">Delete <strong id="delProductName" style="color:var(--text)"></strong>? This cannot be undone.</p></div>
+    <div class="modal-footer"><button class="btn btn-ghost" onclick="closeModal('delProductModal')">Cancel</button><button class="btn btn-danger" onclick="confirmDeleteProduct()"><i class="fas fa-trash"></i> Delete</button></div>
+  </div>
+</div>
+
+<!-- INSTANT CREATE MODAL (category / subcategory / supplier) -->
+<div class="modal-overlay" id="instantModal" style="z-index:2000">
+  <div class="modal" style="max-width:380px">
+    <div class="modal-header">
+      <div class="modal-title" id="instantModalTitle"><i class="fas fa-plus" style="color:var(--accent)"></i>Add New</div>
+      <span class="modal-close" onclick="closeModal('instantModal')"><i class="fas fa-times"></i></span>
+    </div>
+    <div class="modal-body">
+      <div id="instantModalFields"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('instantModal')">Cancel</button>
+      <button class="btn btn-primary" id="instantModalSaveBtn" onclick="saveInstant()"><i class="fas fa-save"></i> Create</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentPage=1; const perPage=20; let allProducts=[]; let categories=[]; let suppliers=[]; let deleteProductId=null;
+let instantType=''; let instantCatSelectId='';
+
+(function(){ Promise.all([loadCategories(),loadSuppliers()]).then(()=>loadProducts()); })(); // FIX 5: non-blocking
+
+async function loadProducts(page=1,q='',cat=''){
+  currentPage=page;
+  const url=`/admin/products/list?page=${page}&q=${encodeURIComponent(q)}&category=${encodeURIComponent(cat)}`;
+  try{
+    const {ok,data}=await apiFetch(url); if(!ok)return;
+    allProducts=data.products||[];
+    document.getElementById('productCount').textContent=data.total||0;
+    renderProducts(allProducts); renderPagination(data.page,data.total,data.per_page);
+  }catch(e){showToast('Error loading products','error');}
+}
+
+function renderProducts(products){
+  const tbody=document.getElementById('productsTbody');
+  if(!products.length){tbody.innerHTML='<tr><td colspan="5"><div class="empty-state"><i class="fas fa-boxes-stacked"></i><p>No products found</p></div></td></tr>';return;}
+  tbody.innerHTML=products.map(p=>`<tr>
+    <td style="font-family:monospace;color:var(--accent);font-weight:600;font-size:.8rem">${p.product_id}</td>
+    <td style="font-weight:500">${p.product_name}</td>
+    <td>${p.category?`<span class="badge badge-blue">${p.category}</span>`:'—'}</td>
+    <td style="color:var(--accent3);font-weight:600">₹${Number(p.unit_price||0).toFixed(2)}</td>
+    <td>
+      <div style="display:flex;gap:5px">
+        <button class="btn btn-ghost btn-sm btn-icon" onclick="viewProduct('${p.product_id}')" title="View"><i class="fas fa-eye" style="color:var(--accent)"></i></button>
+        <button class="btn btn-ghost btn-sm btn-icon" onclick="openEditProduct('${p.product_id}')" title="Edit"><i class="fas fa-pen" style="color:var(--warn)"></i></button>
+        <button class="btn btn-ghost btn-sm btn-icon" onclick="openDelProduct('${p.product_id}','${(p.product_name||'').replace(/'/g,"\\'")}')"><i class="fas fa-trash" style="color:var(--danger)"></i></button>
+      </div>
+    </td>
+  </tr>`).join('');
+}
+
+function renderPagination(page, total, pp){
+  const pages=Math.ceil(total/pp);
+  const el=document.getElementById('productPagination');
+  if(pages<=1){el.innerHTML=`<span style="font-size:.78rem;color:var(--muted)">${total} product${total!==1?'s':''}</span>`;return;}
+  const delta=2; let range=[],left=page-delta,right=page+delta+1,prev=null;
+  for(let i=1;i<=pages;i++){if(i===1||i===pages||(i>=left&&i<right))range.push(i);}
+  let btns='';
+  range.forEach(i=>{
+    if(prev&&i-prev>1)btns+=`<span class="page-btn disabled" style="border:none;background:none;color:var(--muted)">…</span>`;
+    btns+=`<a class="page-btn${i===page?' active':''}" onclick="searchProducts(${i})">${i}</a>`;
+    prev=i;
+  });
+  const start=(page-1)*pp+1, end=Math.min(page*pp,total);
+  el.innerHTML=`
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:10px 0 2px">
+      <span style="font-size:.78rem;color:var(--muted)">Showing <strong style="color:var(--text)">${start}–${end}</strong> of <strong style="color:var(--text)">${total}</strong> products</span>
+      <div style="display:flex;align-items:center;gap:4px">
+        <button class="page-btn${page===1?' disabled':''}" onclick="searchProducts(${page-1})" ${page===1?'disabled':''} title="Prev"><i class="fas fa-chevron-left" style="font-size:.6rem"></i></button>
+        ${btns}
+        <button class="page-btn${page===pages?' disabled':''}" onclick="searchProducts(${page+1})" ${page===pages?'disabled':''} title="Next"><i class="fas fa-chevron-right" style="font-size:.6rem"></i></button>
+      </div>
+    </div>`;
+}
+
+function searchProducts(page=1){ const q=document.getElementById('productSearch').value; const cat=document.getElementById('catFilter').value; loadProducts(page,q,cat); }
+function toggleSearchClear(inp){ /* handled by CSS :not(:placeholder-shown) */ }
+function clearProductSearch(){ const el=document.getElementById('productSearch'); el.value=''; el.focus(); searchProducts(); }
+
+async function loadCategories(){
+  try{
+    const {ok,data}=await apiFetch('/admin/categories'); if(!ok)return;
+    categories=data;
+    const opts='<option value="">— Select —</option>'+data.map(c=>`<option value="${c.category_name}">${c.category_name}</option>`).join('');
+    document.getElementById('catFilter').innerHTML='<option value="">All Categories</option>'+data.map(c=>`<option value="${c.category_name}">${c.category_name}</option>`).join('');
+    ['apCategory','epCategory'].forEach(id=>{if(document.getElementById(id))document.getElementById(id).innerHTML=opts;});
+  }catch(e){}
+}
+
+async function loadSubcategoriesFor(catSelectId,subSelectId){
+  const catName=document.getElementById(catSelectId).value; const subSel=document.getElementById(subSelectId);
+  if(!catName){subSel.innerHTML='<option value="">— Select Category First —</option>';return;}
+  const cat=categories.find(c=>c.category_name===catName); if(!cat)return;
+  const {ok,data}=await apiFetch(`/admin/categories/${cat.id}/subcategories`);
+  if(ok)subSel.innerHTML='<option value="">— Select —</option>'+data.map(s=>`<option value="${s.subcategory_name}">${s.subcategory_name}</option>`).join('');
+}
+
+async function loadSuppliers(){
+  try{
+    const {ok,data}=await apiFetch('/admin/suppliers'); if(!ok)return;
+    suppliers=data;
+    const opts='<option value="">— Select —</option>'+data.map(s=>`<option value="${s.supplier_name}">${s.supplier_name}</option>`).join('');
+    ['apSupplier','epSupplier'].forEach(id=>{if(document.getElementById(id))document.getElementById(id).innerHTML=opts;});
+  }catch(e){}
+}
+
+function onShelfLifeChange(prefix){
+  const sel=document.getElementById(prefix+'ShelfLife');
+  const customInput=document.getElementById(prefix+'ShelfLifeCustom');
+  if(sel.value==='custom'){customInput.style.display='block';customInput.focus();}
+  else customInput.style.display='none';
+}
+
+function getShelfLifeValue(prefix){
+  const sel=document.getElementById(prefix+'ShelfLife');
+  if(sel.value==='custom') return document.getElementById(prefix+'ShelfLifeCustom').value;
+  return sel.value;
+}
+
+function setShelfLifeDropdown(prefix, val){
+  const sel=document.getElementById(prefix+'ShelfLife');
+  const standardValues=['1','3','7','14','30','90','180','365','730','1825','3650','0'];
+  if(standardValues.includes(String(val))){sel.value=String(val);document.getElementById(prefix+'ShelfLifeCustom').style.display='none';}
+  else if(val){sel.value='custom';document.getElementById(prefix+'ShelfLifeCustom').style.display='block';document.getElementById(prefix+'ShelfLifeCustom').value=val;}
+}
+
+function openAddProductModal(){
+  ['apName','apCost','apPrice'].forEach(id=>document.getElementById(id) && (document.getElementById(id).value=''));
+  document.getElementById('apCategory').value=''; document.getElementById('apSupplier').value='';
+  document.getElementById('apSubcategory').innerHTML='<option value="">— Select Category First —</option>';
+  document.getElementById('apShelfLife').value=''; document.getElementById('apShelfLifeCustom').style.display='none';
+  openModal('addProductModal');
+}
+
+async function saveProduct(){
+  const name=document.getElementById('apName').value.trim();
+  if(!name){showToast('Product name is required','error');return;}
+  const shelfLife=getShelfLifeValue('ap');
+  try{
+    const {ok,data}=await apiFetch('/admin/products/add',{method:'POST',body:JSON.stringify({
+      product_id:null,
+      product_name:name, category:document.getElementById('apCategory').value,
+      subcategory:document.getElementById('apSubcategory').value,
+      unit_cost:document.getElementById('apCost').value,
+      unit_price:document.getElementById('apPrice').value,
+      supplier:document.getElementById('apSupplier').value,
+      shelf_life:shelfLife
+    })});
+    if(ok&&data.status==='success'){closeModal('addProductModal');showToast(data.message,'success');searchProducts();}
+    else showToast(data.message||'Error','error');
+  }catch(e){showToast('Error saving product','error');}
+}
+
+function viewProduct(pid){
+  const p=allProducts.find(x=>x.product_id===pid); if(!p)return;
+  document.getElementById('viewProductBody').innerHTML=`
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <!-- Hero card -->
+      <div style="background:linear-gradient(135deg,var(--green-deep) 0%,var(--accent2) 100%);border-radius:14px;padding:20px;display:flex;align-items:center;gap:16px">
+        <div style="width:52px;height:52px;border-radius:14px;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;font-size:1.4rem;color:#fff;flex-shrink:0;backdrop-filter:blur(4px)">
+          <i class="fas fa-box"></i>
+        </div>
+        <div style="flex:1;min-width:0">
+          <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:1.05rem;font-weight:800;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.product_name}</div>
+          <div style="font-family:monospace;font-size:.8rem;color:rgba(255,255,255,.7);margin-top:3px">${p.product_id}</div>
+        </div>
+        ${p.category?`<span style="background:rgba(255,255,255,.18);color:#fff;border-radius:20px;padding:4px 12px;font-size:.72rem;font-weight:700;white-space:nowrap;backdrop-filter:blur(4px)">${p.category}</span>`:''}
+      </div>
+      <!-- Fields grid -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="view-field">
+          <div class="view-label">Unit Cost</div>
+          <div class="view-value">₹${Number(p.unit_cost||0).toFixed(2)}</div>
+        </div>
+        <div class="view-field">
+          <div class="view-label">Unit Price</div>
+          <div class="view-value highlight">₹${Number(p.unit_price||0).toFixed(2)}</div>
+        </div>
+        <div class="view-field">
+          <div class="view-label">Subcategory</div>
+          <div class="view-value">${p.subcategory||'—'}</div>
+        </div>
+        <div class="view-field">
+          <div class="view-label">Shelf Life</div>
+          <div class="view-value">${p.shelf_life?p.shelf_life+' days':'—'}</div>
+        </div>
+        <div class="view-field" style="grid-column:1/-1">
+          <div class="view-label">Supplier</div>
+          <div class="view-value">${p.supplier||'—'}</div>
+        </div>
+      </div>
+    </div>`;
+  openModal('viewProductModal');
+}
+
+function openEditProduct(pid){
+  const p=allProducts.find(x=>x.product_id===pid); if(!p)return;
+  document.getElementById('epId').value=p.product_id;
+  document.getElementById('epProductId').value=p.product_id;
+  document.getElementById('epName').value=p.product_name||'';
+  document.getElementById('epCost').value=p.unit_cost||'';
+  document.getElementById('epPrice').value=p.unit_price||'';
+  setShelfLifeDropdown('ep', p.shelf_life);
+  if(p.category){document.getElementById('epCategory').value=p.category;loadSubcategoriesFor('epCategory','epSubcategory').then(()=>{document.getElementById('epSubcategory').value=p.subcategory||'';});}
+  if(p.supplier)document.getElementById('epSupplier').value=p.supplier;
+  openModal('editProductModal');
+}
+
+async function updateProduct(){
+  const id=document.getElementById('epId').value;
+  const shelfLife=getShelfLifeValue('ep');
+  try{
+    const {ok,data}=await apiFetch(`/admin/products/${id}/edit`,{method:'POST',body:JSON.stringify({
+      product_name:document.getElementById('epName').value,
+      category:document.getElementById('epCategory').value,
+      subcategory:document.getElementById('epSubcategory').value,
+      unit_cost:document.getElementById('epCost').value,
+      unit_price:document.getElementById('epPrice').value,
+      supplier:document.getElementById('epSupplier').value,
+      shelf_life:shelfLife
+    })});
+    if(ok&&data.status==='success'){closeModal('editProductModal');showToast('Product updated','success');searchProducts();}
+    else showToast(data.message||'Error','error');
+  }catch(e){showToast('Error updating product','error');}
+}
+
+function openDelProduct(id,name){deleteProductId=id;document.getElementById('delProductName').textContent=name;openModal('delProductModal');}
+async function confirmDeleteProduct(){
+  if(!deleteProductId)return;
+  try{
+    const {ok,data}=await apiFetch(`/admin/products/${deleteProductId}/delete`,{method:'POST'});
+    if(ok&&data.status==='success'){closeModal('delProductModal');showToast('Product deleted','success');searchProducts();}
+    else showToast(data.message||'Error','error');
+  }catch(e){showToast('Error','error');}
+  deleteProductId=null;
+}
+
+/* ─── INSTANT CREATE MODALS ─── */
+function openInstantModal(type, catSelectId=''){
+  instantType=type; instantCatSelectId=catSelectId;
+  const titles={category:'Add New Category',subcategory:'Add New Subcategory',supplier:'Add New Supplier'};
+  document.getElementById('instantModalTitle').innerHTML=`<i class="fas fa-plus" style="color:var(--accent)"></i>${titles[type]}`;
+  let fields='';
+  if(type==='category'){
+    fields=`<div class="form-group"><label class="form-label">Category Name *</label><input type="text" class="form-control" id="instantField1" placeholder="e.g. Electronics"/></div>`;
+  } else if(type==='subcategory'){
+    const catName=catSelectId?document.getElementById(catSelectId).value:'';
+    fields=`<div class="form-group"><label class="form-label">Parent Category</label><input type="text" class="form-control" value="${catName}" readonly style="opacity:.6"/></div>
+    <div class="form-group"><label class="form-label">Subcategory Name *</label><input type="text" class="form-control" id="instantField1" placeholder="e.g. Mobile Phones"/></div>`;
+  } else if(type==='supplier'){
+    fields=`<div class="form-group"><label class="form-label">Supplier Name *</label><input type="text" class="form-control" id="instantField1" placeholder="e.g. FreshFoods Co."/></div>
+    <div class="form-group"><label class="form-label">Email *</label><input type="email" class="form-control" id="instantField2" placeholder="supplier@email.com"/></div>
+    <div class="form-group"><label class="form-label">Phone</label><input type="text" class="form-control" id="instantField3" placeholder="+91 98765 43210"/></div>`;
+  }
+  document.getElementById('instantModalFields').innerHTML=fields;
+  openModal('instantModal');
+  setTimeout(()=>{const f=document.getElementById('instantField1');if(f)f.focus();},100);
+}
+
+async function saveInstant(){
+  const name=(document.getElementById('instantField1')?.value||'').trim();
+  if(!name){showToast('Name is required','error');return;}
+  let url='',body={};
+  if(instantType==='category'){
+    url='/admin/categories/add'; body={category_name:name};
+  } else if(instantType==='subcategory'){
+    const catName=instantCatSelectId?document.getElementById(instantCatSelectId).value:'';
+    const cat=categories.find(c=>c.category_name===catName);
+    if(!cat){showToast('Select a category first','error');return;}
+    url=`/admin/categories/${cat.id}/subcategories/add`; body={subcategory_name:name};
+  } else if(instantType==='supplier'){
+    const email=(document.getElementById('instantField2')?.value||'').trim();
+    if(!email){showToast('Email is required','error');return;}
+    url='/admin/suppliers/add'; body={supplier_name:name,email,phone:document.getElementById('instantField3')?.value||''};
+  }
+  try{
+    const {ok,data}=await apiFetch(url,{method:'POST',body:JSON.stringify(body)});
+    if(ok&&(data.status==='success'||data.id)){
+      showToast(`${instantType.charAt(0).toUpperCase()+instantType.slice(1)} created`,'success');
+      closeModal('instantModal');
+      if(instantType==='category'||instantType==='subcategory') await loadCategories();
+      if(instantType==='supplier') await loadSuppliers();
+      // Refresh subcategories if in subcategory mode
+      if(instantType==='subcategory'&&instantCatSelectId){
+        const otherSub=instantCatSelectId==='apCategory'?'apSubcategory':'epSubcategory';
+        await loadSubcategoriesFor(instantCatSelectId,otherSub);
+      }
+    } else showToast(data.message||'Error creating '+instantType,'error');
+  }catch(e){showToast('Error','error');}
+}
+
+function openModal(id){document.getElementById(id).classList.add('open');}
+function closeModal(id){document.getElementById(id).classList.remove('open');}
+</script>
+{% endblock %}

@@ -1,0 +1,225 @@
+{% extends "manager/base.html" %}
+{% block title %}Seasonal Planning{% endblock %}
+{% block page_title %}<i class="fas fa-calendar-days" style="color:var(--accent);margin-right:8px"></i>Seasonal Planning{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header" style="flex-wrap:wrap;gap:10px">
+    <div style="display:flex;align-items:center;gap:12px">
+      <div class="card-title">Seasonal Plans</div>
+      <span id="spCount" class="badge badge-blue">—</span>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+      <div style="position:relative">
+        <i class="fas fa-search" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:.8rem"></i>
+        <input type="text" id="spSearch" class="form-control" placeholder="Search…" style="padding-left:32px;width:180px" oninput="debounce()"/>
+      </div>
+      <button class="btn btn-primary" onclick="openAddSP()"><i class="fas fa-plus"></i> Add Plan</button>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>#</th><th>Month</th><th>Site</th><th>Category</th><th>Forecasted</th><th>Actual</th><th>Adjustment</th></tr></thead>
+      <tbody id="spTbody"><tr><td colspan="8" style="text-align:center;padding:32px"><span class="spinner"></span></td></tr></tbody>
+    </table>
+  </div>
+  <div id="spPag" style="padding:14px 0 0"></div>
+</div>
+
+<!-- ADD MODAL -->
+<div class="modal-overlay" id="addSPModal">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-header">
+      <div class="modal-title"><i class="fas fa-plus" style="color:var(--accent)"></i>Add Seasonal Plan</div>
+      <span class="modal-close" onclick="closeModal('addSPModal')"><i class="fas fa-times"></i></span>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group"><label class="form-label">Month <span style="color:var(--danger)">*</span></label>
+          <select class="form-control" id="aspMonth">
+            <option value="">— Select Month —</option>
+            <option>January</option><option>February</option><option>March</option><option>April</option>
+            <option>May</option><option>June</option><option>July</option><option>August</option>
+            <option>September</option><option>October</option><option>November</option><option>December</option>
+          </select></div>
+        <div class="form-group"><label class="form-label">Site</label>
+          <select class="form-control" id="aspSite"><option value="">All Sites</option></select></div>
+        <div class="form-group"><label class="form-label">Product Category</label>
+          <input type="text" class="form-control" id="aspCategory" placeholder="e.g. Beverages"/></div>
+        <div class="form-group"><label class="form-label">Forecasted Sales</label>
+          <input type="number" class="form-control" id="aspForecast" placeholder="0" step="0.01"/></div>
+        <div class="form-group"><label class="form-label">Actual Sales</label>
+          <input type="number" class="form-control" id="aspActual" placeholder="0" step="0.01"/></div>
+        <div class="form-group"><label class="form-label">Seasonal Adjustment</label>
+          <input type="number" class="form-control" id="aspAdj" placeholder="0" step="0.01"/></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('addSPModal')">Cancel</button>
+      <button class="btn btn-primary" id="addSPBtn" onclick="saveSP()"><i class="fas fa-save"></i> Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT MODAL -->
+<div class="modal-overlay" id="editSPModal">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-header">
+      <div class="modal-title"><i class="fas fa-pen" style="color:var(--warn)"></i>Edit Seasonal Plan</div>
+      <span class="modal-close" onclick="closeModal('editSPModal')"><i class="fas fa-times"></i></span>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="espId"/>
+      <div class="form-grid">
+        <div class="form-group"><label class="form-label">Month <span style="color:var(--danger)">*</span></label>
+          <select class="form-control" id="espMonth">
+            <option value="">— Select Month —</option>
+            <option>January</option><option>February</option><option>March</option><option>April</option>
+            <option>May</option><option>June</option><option>July</option><option>August</option>
+            <option>September</option><option>October</option><option>November</option><option>December</option>
+          </select></div>
+        <div class="form-group"><label class="form-label">Site</label>
+          <select class="form-control" id="espSite"><option value="">All Sites</option></select></div>
+        <div class="form-group"><label class="form-label">Product Category</label>
+          <input type="text" class="form-control" id="espCategory"/></div>
+        <div class="form-group"><label class="form-label">Forecasted Sales</label>
+          <input type="number" class="form-control" id="espForecast" step="0.01"/></div>
+        <div class="form-group"><label class="form-label">Actual Sales</label>
+          <input type="number" class="form-control" id="espActual" step="0.01"/></div>
+        <div class="form-group"><label class="form-label">Seasonal Adjustment</label>
+          <input type="number" class="form-control" id="espAdj" step="0.01"/></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('editSPModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="updateSP()"><i class="fas fa-save"></i> Update</button>
+    </div>
+  </div>
+</div>
+
+<!-- DELETE CONFIRM -->
+<div class="modal-overlay" id="delSPModal">
+  <div class="modal" style="max-width:400px">
+    <div class="modal-header">
+      <div class="modal-title" style="color:var(--danger)"><i class="fas fa-trash"></i>Delete Plan</div>
+      <span class="modal-close" onclick="closeModal('delSPModal')"><i class="fas fa-times"></i></span>
+    </div>
+    <div class="modal-body"><p style="color:var(--muted)">Delete this seasonal plan? Cannot be undone.</p></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('delSPModal')">Cancel</button>
+      <button class="btn btn-danger" onclick="confirmDelSP()"><i class="fas fa-trash"></i> Delete</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let spPage=1,spTimer=null,delSPId=null,allSPs=[];
+function debounce(){clearTimeout(spTimer);spTimer=setTimeout(()=>loadSPs(1),300);}
+(async()=>{ await loadSites(); loadSPs(1); })();
+
+async function loadSites(){
+  try{
+    const {ok,data}=await apiFetch('/api/sites-list');if(!ok)return;
+    const opts='<option value="">All Sites</option>'+(data.sites||[]).map(s=>`<option value="${s.site_id}">${s.site_name}</option>`).join('');
+    document.getElementById('aspSite').innerHTML=opts;
+    document.getElementById('espSite').innerHTML=opts;
+  }catch(e){}
+}
+async function loadSPs(page=1){
+  spPage=page;
+  const q=document.getElementById('spSearch').value.trim();
+  const {ok,data}=await apiFetch(`/manager/api/seasonal-plans?page=${page}&q=${encodeURIComponent(q)}`);
+  if(!ok)return;
+  allSPs=data.records||[];
+  document.getElementById('spCount').textContent=data.total||0;
+  const tbody=document.getElementById('spTbody');
+  if(!allSPs.length){tbody.innerHTML='<tr><td colspan="8"><div class="empty-state"><i class="fas fa-calendar-days"></i><p>No seasonal plans found</p></div></td></tr>';document.getElementById('spPag').innerHTML='';return;}
+  tbody.innerHTML=allSPs.map((r,i)=>`<tr>
+    <td style="color:var(--muted)">${(page-1)*20+i+1}</td>
+    <td style="font-weight:500">${r.month||'—'}</td>
+    <td style="color:var(--muted)">${r.site_name||r.site_id||'All Sites'}</td>
+    <td>${r.category||'—'}</td>
+    <td style="color:#3b82f6;font-weight:600">${Number(r.forecasted_sales||0).toLocaleString()}</td>
+    <td style="font-weight:600">${Number(r.actual_sales||0).toLocaleString()}</td>
+    <td style="color:var(--orange)">${Number(r.seasonal_adj||0).toLocaleString()}</td>
+    
+  </tr>`).join('');
+  renderPag('spPag',page,data.total,20,'loadSPs');
+}
+function openModal(id){document.getElementById(id).classList.add('open');}
+function closeModal(id){document.getElementById(id).classList.remove('open');}
+function openAddSP(){
+  ['aspMonth','aspSite','aspCategory','aspForecast','aspActual','aspAdj'].forEach(id=>document.getElementById(id).value='');
+  openModal('addSPModal');
+}
+async function saveSP(){
+  const month=document.getElementById('aspMonth').value;
+  if(!month){showToast('Month is required','error');return;}
+  const btn=document.getElementById('addSPBtn');
+  btn.disabled=true;btn.innerHTML='<span class="spinner"></span>';
+  try{
+    const {ok,data}=await apiFetch('/manager/api/seasonal-plans',{method:'POST',body:JSON.stringify({
+      month,site_id:document.getElementById('aspSite').value,
+      category:document.getElementById('aspCategory').value,
+      forecasted_sales:document.getElementById('aspForecast').value||0,
+      actual_sales:document.getElementById('aspActual').value||0,
+      seasonal_adj:document.getElementById('aspAdj').value||0,
+    })});
+    if(ok&&data.status==='success'){closeModal('addSPModal');await loadSPs(spPage);showToast('Plan created','success');}
+    else showToast(data.message||'Failed','error');
+  }catch(e){showToast('Error','error');}
+  finally{btn.disabled=false;btn.innerHTML='<i class="fas fa-save"></i> Save';}
+}
+function openEditSP(idx){
+  const r=allSPs[idx];if(!r)return;
+  document.getElementById('espId').value=r.id;
+  document.getElementById('espMonth').value=r.month||'';
+  document.getElementById('espSite').value=r.site_id||'';
+  document.getElementById('espCategory').value=r.category||'';
+  document.getElementById('espForecast').value=r.forecasted_sales||0;
+  document.getElementById('espActual').value=r.actual_sales||0;
+  document.getElementById('espAdj').value=r.seasonal_adj||0;
+  openModal('editSPModal');
+}
+async function updateSP(){
+  const id=document.getElementById('espId').value;
+  try{
+    const {ok,data}=await apiFetch(`/manager/api/seasonal-plans/${id}`,{method:'PUT',body:JSON.stringify({
+      month:document.getElementById('espMonth').value,
+      site_id:document.getElementById('espSite').value,
+      category:document.getElementById('espCategory').value,
+      forecasted_sales:document.getElementById('espForecast').value||0,
+      actual_sales:document.getElementById('espActual').value||0,
+      seasonal_adj:document.getElementById('espAdj').value||0,
+    })});
+    if(ok&&data.status==='success'){closeModal('editSPModal');await loadSPs(spPage);showToast('Updated','success');}
+    else showToast(data.message||'Failed','error');
+  }catch(e){showToast('Error','error');}
+}
+function openDelSP(id){delSPId=id;openModal('delSPModal');}
+async function confirmDelSP(){
+  if(!delSPId)return;
+  const {ok,data}=await apiFetch(`/manager/api/seasonal-plans/${delSPId}`,{method:'DELETE'});
+  if(ok&&data.status==='success'){closeModal('delSPModal');await loadSPs(spPage);showToast('Deleted','success');}
+  else showToast(data.message||'Failed','error');
+  delSPId=null;
+}
+function renderPag(elId,page,total,pp,fn){
+  const pages=Math.ceil(total/pp);const el=document.getElementById(elId);if(!el)return;
+  if(pages<=1){el.innerHTML=`<span style="font-size:.78rem;color:var(--muted)">${total} record${total!==1?'s':''}</span>`;return;}
+  let btns='',prev=null;const d=2,left=page-d,right=page+d+1;
+  for(let i=1;i<=pages;i++){if(i===1||i===pages||(i>=left&&i<right)){if(prev&&i-prev>1)btns+=`<span class="page-btn disabled">…</span>`;btns+=`<a class="page-btn${i===page?' active':''}" onclick="${fn}(${i})">${i}</a>`;prev=i;}}
+  const s=(page-1)*pp+1,e=Math.min(page*pp,total);
+  el.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:10px 0 2px">
+    <span style="font-size:.78rem;color:var(--muted)">Showing <strong>${s}–${e}</strong> of <strong>${total}</strong></span>
+    <div style="display:flex;gap:4px">
+      <button class="page-btn${page===1?' disabled':''}" onclick="${fn}(${page-1})" ${page===1?'disabled':''}><i class="fas fa-chevron-left" style="font-size:.6rem"></i></button>
+      ${btns}
+      <button class="page-btn${page===pages?' disabled':''}" onclick="${fn}(${page+1})" ${page===pages?'disabled':''}><i class="fas fa-chevron-right" style="font-size:.6rem"></i></button>
+    </div>
+  </div>`;
+}
+</script>
+{% endblock %}

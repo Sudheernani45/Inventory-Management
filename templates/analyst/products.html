@@ -1,0 +1,58 @@
+{% extends "analyst/base.html" %}
+{% block title %}Products{% endblock %}
+{% block page_title %}Products{% endblock %}
+{% block content %}
+<div style="margin-bottom:24px">
+  <h2 style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:1.3rem;color:var(--text);margin:0 0 4px">Products</h2>
+  <p style="color:var(--muted);font-size:.82rem;margin:0">Read-only product catalog view.</p>
+</div>
+<div class="card">
+  <div class="card-header">
+    <div class="card-title"><i class="fas fa-boxes-stacked" style="color:#6366f1"></i> Product Catalog</div>
+    <div class="product-search-wrap">
+      <div class="product-search-field">
+        <i class="fas fa-magnifying-glass search-icon"></i>
+        <input type="text" class="search-input" id="prodSearch" placeholder="Search products…" oninput="searchProds()" autocomplete="off"/>
+        <button class="search-clear" onclick="clearAnalystSearch()" tabindex="-1" title="Clear"><i class="fas fa-xmark"></i></button>
+      </div>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Product ID</th><th>Name</th><th>Category</th><th>Subcategory</th><th>Unit Cost</th><th>Unit Price</th><th>Supplier</th></tr></thead>
+      <tbody id="prodTbody"><tr><td colspan="7"><div class="empty-state"><span class="spinner"></span></div></td></tr></tbody>
+    </table>
+  </div>
+  <div id="prodPager" style="display:flex;justify-content:flex-end;padding:14px 20px;gap:8px"></div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+let currentPage=1,searchQ='';
+async function loadProds(page){
+  if(page)currentPage=page;
+  document.getElementById('prodTbody').innerHTML='<tr><td colspan="7"><div class="empty-state"><span class="spinner"></span></div></td></tr>';
+  const {ok,data}=await apiFetch(`/analyst/api/products?page=${currentPage}&q=${encodeURIComponent(searchQ)}`);
+  if(!ok) return;
+  const tbody=document.getElementById('prodTbody');
+  if(!data.products?.length){tbody.innerHTML='<tr><td colspan="7"><div class="empty-state"><i class="fas fa-boxes-stacked"></i><p>No products found</p></div></td></tr>';return;}
+  tbody.innerHTML=data.products.map(p=>`<tr>
+    <td style="font-family:monospace;color:var(--accent);font-size:.78rem">${p.product_id}</td>
+    <td style="font-weight:600">${p.product_name||'--'}</td>
+    <td><span class="badge badge-blue" style="font-size:.7rem">${p.category||'--'}</span></td>
+    <td style="color:var(--muted)">${p.subcategory||'--'}</td>
+    <td>Rs ${Number(p.unit_cost||0).toLocaleString('en-IN',{minimumFractionDigits:2})}</td>
+    <td style="color:var(--success);font-weight:600">Rs ${Number(p.unit_price||0).toLocaleString('en-IN',{minimumFractionDigits:2})}</td>
+    <td style="color:var(--muted)">${p.supplier||'--'}</td>
+  </tr>`).join('');
+  const pages=Math.ceil(data.total/data.per_page);
+  const pager=document.getElementById('prodPager');
+  pager.innerHTML=currentPage>1?`<button onclick="loadProds(${currentPage-1})" style="background:var(--surface2);border:1px solid var(--border);padding:6px 12px;border-radius:7px;font-size:.78rem;cursor:pointer">Prev</button>`:'';
+  pager.innerHTML+=`<span style="font-size:.78rem;color:var(--muted);padding:6px 10px">Page ${currentPage}/${pages}</span>`;
+  if(currentPage<pages)pager.innerHTML+=`<button onclick="loadProds(${currentPage+1})" style="background:var(--surface2);border:1px solid var(--border);padding:6px 12px;border-radius:7px;font-size:.78rem;cursor:pointer">Next</button>`;
+}
+function searchProds(){searchQ=document.getElementById('prodSearch').value;loadProds(1);}
+function clearAnalystSearch(){ const el=document.getElementById('prodSearch'); el.value=''; searchQ=''; el.focus(); loadProds(1); }
+loadProds();
+</script>
+{% endblock %}

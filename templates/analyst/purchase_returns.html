@@ -1,0 +1,155 @@
+{% extends "analyst/base.html" %}
+{% block title %}Purchase Returns{% endblock %}
+{% block page_title %}<i class="fas fa-boxes-packing" style="color:var(--green-brand);margin-right:8px"></i>Purchase Returns{% endblock %}
+
+{% block content %}
+<!-- Stats bar -->
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px">
+  <div class="card" style="padding:16px 18px;margin:0">
+    <div style="font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;font-weight:600">Total Returns</div>
+    <div style="font-size:1.5rem;font-weight:800;font-family:'Plus Jakarta Sans',sans-serif;color:var(--text);margin-top:4px" id="prStatTotal">—</div>
+  </div>
+  <div class="card" style="padding:16px 18px;margin:0">
+    <div style="font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;font-weight:600">Pending</div>
+    <div style="font-size:1.5rem;font-weight:800;font-family:'Plus Jakarta Sans',sans-serif;color:var(--warn);margin-top:4px" id="prStatPending">—</div>
+  </div>
+  <div class="card" style="padding:16px 18px;margin:0">
+    <div style="font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;font-weight:600">Approved</div>
+    <div style="font-size:1.5rem;font-weight:800;font-family:'Plus Jakarta Sans',sans-serif;color:var(--accent);margin-top:4px" id="prStatApproved">—</div>
+  </div>
+  <div class="card" style="padding:16px 18px;margin:0">
+    <div style="font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;font-weight:600">Total Credit Value</div>
+    <div style="font-size:1.1rem;font-weight:800;font-family:'Plus Jakarta Sans',sans-serif;color:#6366f1;margin-top:4px" id="prStatValue">—</div>
+  </div>
+</div>
+
+<!-- Read-only banner -->
+<div style="background:linear-gradient(135deg,rgba(14,107,63,.08),rgba(99,102,241,.06));border:1px solid rgba(14,107,63,.18);border-radius:12px;padding:13px 18px;margin-bottom:18px;display:flex;align-items:center;gap:12px;font-size:.8rem;color:var(--text)">
+  <i class="fas fa-eye" style="color:var(--green-brand);font-size:1rem"></i>
+  <div><strong>Analyst View</strong> — Read-only access to purchase return records. Contact an Admin or Manager to create or action returns.</div>
+</div>
+
+<div class="card">
+  <div class="card-header" style="flex-wrap:wrap;gap:10px">
+    <div style="display:flex;align-items:center;gap:12px">
+      <div class="card-title">Purchase Returns</div>
+      <span id="prCount" class="badge badge-blue">—</span>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+      <div style="position:relative">
+        <i class="fas fa-search" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:.8rem"></i>
+        <input type="text" id="prSearch" class="form-control" placeholder="Search PO #, supplier…" style="padding-left:32px;width:200px" oninput="debPR()"/>
+      </div>
+      <select class="form-control" id="prStatusFilter" style="width:140px" onchange="loadPRs()">
+        <option value="">All Statuses</option>
+        <option value="Pending">Pending</option>
+        <option value="Approved">Approved</option>
+        <option value="Rejected">Rejected</option>
+      </select>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>#</th><th>Return #</th><th>PO #</th><th>Supplier</th><th>Product</th><th>Qty</th><th>Unit Cost</th><th>Credit</th><th>Date</th><th>Status</th><th>View</th></tr></thead>
+      <tbody id="prTbody"><tr><td colspan="11" style="text-align:center;padding:32px"><span class="spinner"></span></td></tr></tbody>
+    </table>
+  </div>
+  <div id="prPag" style="display:flex;align-items:center;justify-content:space-between;padding:14px 0 0;font-size:.82rem;color:var(--muted)"></div>
+</div>
+
+<!-- VIEW RETURN MODAL (read-only) -->
+<div class="modal-overlay" id="viewPRModal">
+  <div class="modal" style="max-width:500px">
+    <div class="modal-header">
+      <div class="modal-title"><i class="fas fa-eye" style="color:var(--green-brand)"></i>Return Details</div>
+      <span class="modal-close" onclick="closeModal('viewPRModal')"><i class="fas fa-times"></i></span>
+    </div>
+    <div class="modal-body" id="viewPRBody"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('viewPRModal')">Close</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let prPage=1, prTimer=null, prData=[];
+function debPR(){clearTimeout(prTimer);prTimer=setTimeout(()=>loadPRs(1),350);}
+function fmtR(n){n=Number(n)||0;if(n>=1e5)return'₹'+(n/1e5).toFixed(1)+'L';if(n>=1e3)return'₹'+(n/1e3).toFixed(1)+'K';return'₹'+n.toFixed(2);}
+
+async function loadPRs(page=1){
+  prPage=page;
+  const q=document.getElementById('prSearch').value.trim();
+  const status=document.getElementById('prStatusFilter').value;
+  const{ok,data}=await apiFetch(`/analyst/api/purchase-returns?page=${page}&q=${encodeURIComponent(q)}&status=${encodeURIComponent(status)}`);
+  if(!ok)return;
+  prData=data.returns||[];
+  document.getElementById('prCount').textContent=data.total||0;
+  const pending=prData.filter(r=>r.status==='Pending').length;
+  const approved=prData.filter(r=>r.status==='Approved').length;
+  const totalCredit=prData.reduce((s,r)=>s+Number(r.total_credit||0),0);
+  document.getElementById('prStatTotal').textContent=data.total||0;
+  document.getElementById('prStatPending').textContent=pending;
+  document.getElementById('prStatApproved').textContent=approved;
+  document.getElementById('prStatValue').textContent=fmtR(totalCredit);
+  const tbody=document.getElementById('prTbody');
+  if(!prData.length){tbody.innerHTML='<tr><td colspan="11"><div class="empty-state"><i class="fas fa-boxes-packing"></i><p>No purchase returns found</p></div></td></tr>';document.getElementById('prPag').innerHTML='';return;}
+  const SC={Pending:'badge-warn',Approved:'badge-green',Rejected:'badge-red'};
+  tbody.innerHTML=prData.map((r,i)=>`<tr>
+    <td style="color:var(--muted)">${(page-1)*20+i+1}</td>
+    <td><span style="font-family:monospace;font-weight:700;color:var(--accent)">${r.return_number||'—'}</span></td>
+    <td style="font-weight:600">${r.po_number||'—'}</td>
+    <td>${r.supplier||'—'}</td>
+    <td style="font-size:.83rem">${r.product_name||'—'}</td>
+    <td style="text-align:center">${r.quantity||0}</td>
+    <td style="color:var(--muted)">₹${Number(r.unit_cost||0).toLocaleString()}</td>
+    <td style="font-weight:700;color:#6366f1">${fmtR(r.total_credit||0)}</td>
+    <td style="color:var(--muted);font-size:.8rem">${r.created_at||'—'}</td>
+    <td><span class="badge ${SC[r.status]||'badge-blue'}">${r.status||'—'}</span></td>
+    <td><button class="btn btn-ghost btn-sm btn-icon" onclick="viewPR(${i})" title="View Details"><i class="fas fa-eye" style="color:var(--green-brand)"></i></button></td>
+  </tr>`).join('');
+  renderPag('prPag',page,data.total,20,'loadPRs');
+}
+
+function viewPR(i){
+  const r=prData[i];if(!r)return;
+  const SC={Pending:'var(--warn)',Approved:'var(--accent)',Rejected:'var(--danger)'};
+  document.getElementById('viewPRBody').innerHTML=`
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div style="background:linear-gradient(135deg,#1e1b4b,#3730a3);border-radius:14px;padding:16px 20px;color:#fff;display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-size:.7rem;opacity:.7;margin-bottom:4px">PURCHASE RETURN</div>
+          <div style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:1rem">${r.return_number}</div>
+          <div style="font-size:.75rem;opacity:.75;margin-top:3px">PO: ${r.po_number} · ${r.supplier||'—'}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:.65rem;opacity:.7">Credit Amount</div>
+          <div style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:1.4rem">₹${Number(r.total_credit||0).toLocaleString('en-IN',{minimumFractionDigits:2})}</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="view-field"><div class="view-label">Status</div><div class="view-value" style="color:${SC[r.status]||'var(--text)'}">● ${r.status||'—'}</div></div>
+        <div class="view-field"><div class="view-label">Site</div><div class="view-value">${r.site||'—'}</div></div>
+        <div class="view-field"><div class="view-label">Product</div><div class="view-value">${r.product_name||'—'}</div></div>
+        <div class="view-field"><div class="view-label">Supplier</div><div class="view-value">${r.supplier||'—'}</div></div>
+        <div class="view-field"><div class="view-label">Quantity</div><div class="view-value">${r.quantity||0}</div></div>
+        <div class="view-field"><div class="view-label">Unit Cost</div><div class="view-value">₹${Number(r.unit_cost||0).toLocaleString()}</div></div>
+        <div class="view-field"><div class="view-label">Return Reason</div><div class="view-value" style="font-size:.85rem">${r.return_reason||'—'}</div></div>
+        <div class="view-field"><div class="view-label">Created</div><div class="view-value">${r.created_at||'—'}</div></div>
+        ${r.approved_at?`<div class="view-field"><div class="view-label">Approved By</div><div class="view-value">${r.approved_by||'—'}</div></div><div class="view-field"><div class="view-label">Approved At</div><div class="view-value">${r.approved_at}</div></div>`:''}
+      </div>
+      ${r.notes?`<div class="view-field"><div class="view-label">Notes</div><div class="view-value" style="font-size:.83rem;white-space:pre-wrap">${r.notes}</div></div>`:''}
+      <div style="background:rgba(14,107,63,.07);border:1px solid rgba(14,107,63,.18);border-radius:9px;padding:10px 14px;display:flex;align-items:center;gap:8px;font-size:.75rem;color:var(--green-brand)">
+        <i class="fas fa-lock"></i> Read-only view — contact Admin/Manager to action this return.
+      </div>
+    </div>`;
+  openModal('viewPRModal');
+}
+
+function openModal(id){document.getElementById(id).classList.add('open');}
+function closeModal(id){document.getElementById(id).classList.remove('open');}
+
+loadPRs(1);
+</script>
+{% endblock %}

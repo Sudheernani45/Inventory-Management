@@ -1,0 +1,60 @@
+{% extends "analyst/base.html" %}
+{% block title %}Sales Reports{% endblock %}
+{% block page_title %}Sales Reports{% endblock %}
+{% block content %}
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px">
+  <div>
+    <h2 style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:1.3rem;color:var(--text);margin:0">Sales Reports</h2>
+    <p style="color:var(--muted);font-size:.82rem;margin:4px 0 0">Read-only view of all sales data across sites.</p>
+  </div>
+  <div style="display:flex;gap:10px;align-items:center">
+    <select class="form-control" id="siteFilter" onchange="loadSales()" style="width:180px">
+      <option value="">All Sites</option>
+    </select>
+  </div>
+</div>
+<div class="card">
+  <div class="card-header">
+    <div class="card-title"><i class="fas fa-chart-line" style="color:#6366f1"></i> Sales Records</div>
+    <span id="saleCount" class="badge badge-gray"></span>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Date</th><th>Product</th><th>Site</th><th>Units Sold</th><th>Revenue</th><th>Discounts</th><th>Returns</th></tr></thead>
+      <tbody id="salesTbody"><tr><td colspan="7"><div class="empty-state"><span class="spinner"></span></div></td></tr></tbody>
+    </table>
+  </div>
+  <div id="salesPager" style="display:flex;justify-content:flex-end;padding:14px 20px;gap:8px"></div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+let currentPage=1;
+async function loadSales(page){
+  if(page)currentPage=page;
+  const site=document.getElementById('siteFilter').value;
+  document.getElementById('salesTbody').innerHTML='<tr><td colspan="7"><div class="empty-state"><span class="spinner"></span></div></td></tr>';
+  const {ok,data}=await apiFetch(`/analyst/api/sales-data?page=${currentPage}&site_id=${site}`);
+  if(!ok) return;
+  if(data.sites){const s=document.getElementById('siteFilter');if(s.options.length<=1)data.sites.forEach(si=>s.innerHTML+=`<option value="${si.site_id}">${si.site_name||si.site_id}</option>`);}
+  document.getElementById('saleCount').textContent=`${data.total} records`;
+  const tbody=document.getElementById('salesTbody');
+  if(!data.records?.length){tbody.innerHTML='<tr><td colspan="7"><div class="empty-state"><i class="fas fa-chart-line"></i><p>No sales data</p></div></td></tr>';return;}
+  tbody.innerHTML=data.records.map(r=>`<tr>
+    <td style="color:var(--muted);font-size:.78rem">${r.date}</td>
+    <td style="font-weight:500">${r.product}</td>
+    <td><span class="badge badge-blue" style="font-size:.7rem">${r.site}</span></td>
+    <td style="text-align:center">${r.units_sold||0}</td>
+    <td style="color:var(--success);font-weight:600">Rs ${Number(r.revenue||0).toLocaleString('en-IN',{minimumFractionDigits:2})}</td>
+    <td style="color:var(--muted)">Rs ${Number(r.discounts||0).toLocaleString('en-IN',{minimumFractionDigits:2})}</td>
+    <td style="color:${r.returns>0?'var(--danger)':'var(--muted)'}">${r.returns||0}</td>
+  </tr>`).join('');
+  const pages=Math.ceil(data.total/data.per_page);
+  const pager=document.getElementById('salesPager');
+  pager.innerHTML=currentPage>1?`<button class="btn btn-sm" onclick="loadSales(${currentPage-1})" style="background:var(--surface2);border:1px solid var(--border);padding:6px 12px;border-radius:7px;font-size:.78rem;cursor:pointer">Prev</button>`:'';
+  pager.innerHTML+=`<span style="font-size:.78rem;color:var(--muted);padding:6px 10px">Page ${currentPage}/${pages}</span>`;
+  if(currentPage<pages)pager.innerHTML+=`<button class="btn btn-sm" onclick="loadSales(${currentPage+1})" style="background:var(--surface2);border:1px solid var(--border);padding:6px 12px;border-radius:7px;font-size:.78rem;cursor:pointer">Next</button>`;
+}
+loadSales();
+</script>
+{% endblock %}

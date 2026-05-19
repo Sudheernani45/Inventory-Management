@@ -1,0 +1,379 @@
+{% extends "manager/base.html" %}
+{% block title %}Audit Log{% endblock %}
+{% block page_title %}Audit Log{% endblock %}
+
+{% block head %}
+<style>
+  .action-badge { display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:20px;font-size:.63rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase; }
+  .action-CREATE { background:rgba(34,197,94,.12); color:#22c55e; }
+  .action-UPDATE { background:rgba(59,130,246,.12); color:#3b82f6; }
+  .action-DELETE { background:rgba(239,68,68,.12);  color:#ef4444; }
+  .action-LOGIN  { background:rgba(232,197,71,.12); color:#e8c547; }
+  .action-LOGOUT { background:rgba(139,143,168,.1); color:#8b8fa8; }
+  .action-VIEW   { background:rgba(139,92,246,.12); color:#a78bfa; }
+  .action-EXPORT { background:rgba(249,115,22,.12); color:#f97316; }
+
+  .module-badge { display:inline-block;padding:2px 7px;border-radius:6px;font-size:.62rem;font-weight:600;background:var(--surface3,#252832);color:var(--muted,#8b8fa8);border:1px solid var(--border,rgba(255,255,255,.07)); }
+
+  .filter-bar { display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:16px; }
+  .audit-detail { font-size:.76rem;color:var(--muted,#8b8fa8);max-width:320px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+  .audit-detail:hover { white-space:normal;overflow:visible; }
+
+  .timeline-dot { width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:4px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Stats -->
+<div class="stats-grid" style="margin-bottom:20px">
+  <div class="stat-card yellow">
+    <div class="stat-icon"><i class="fas fa-scroll"></i></div>
+    <div><div class="stat-label">Total Events</div><div class="stat-value" id="statTotal">—</div></div>
+  </div>
+  <div class="stat-card green">
+    <div class="stat-icon"><i class="fas fa-plus-circle"></i></div>
+    <div><div class="stat-label">Creates</div><div class="stat-value" id="statCreates">—</div></div>
+  </div>
+  <div class="stat-card blue">
+    <div class="stat-icon"><i class="fas fa-pen"></i></div>
+    <div><div class="stat-label">Updates</div><div class="stat-value" id="statUpdates">—</div></div>
+  </div>
+  <div class="stat-card red">
+    <div class="stat-icon"><i class="fas fa-trash"></i></div>
+    <div><div class="stat-label">Deletes</div><div class="stat-value" id="statDeletes">—</div></div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <div style="display:flex;align-items:center;gap:10px">
+      <div class="card-title"><i class="fas fa-scroll" style="color:var(--accent)"></i> Audit Log</div>
+      <span id="logCount" class="badge badge-yellow">—</span>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button class="btn btn-ghost btn-sm" onclick="exportLog()"><i class="fas fa-download"></i> Export CSV</button>
+      <button class="btn btn-ghost btn-sm" onclick="loadAuditLog(1)"><i class="fas fa-rotate-right"></i> Refresh</button>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="filter-bar">
+    <div class="search-box">
+      <i class="fas fa-search"></i>
+      <input type="text" class="form-control" id="auditSearch" placeholder="Search user, action, detail…" style="width:220px" oninput="debouncedLoad()"/>
+    </div>
+    <select class="form-control" id="filterAction" style="width:130px" onchange="loadAuditLog(1)">
+      <option value="">All Actions</option>
+      <option value="CREATE">Create</option>
+      <option value="UPDATE">Update</option>
+      <option value="DELETE">Delete</option>
+      <option value="LOGIN">Login</option>
+      <option value="LOGOUT">Logout</option>
+      <option value="VIEW">View</option>
+      <option value="EXPORT">Export</option>
+    </select>
+    <select class="form-control" id="filterModule" style="width:140px" onchange="loadAuditLog(1)">
+      <option value="">All Modules</option>
+      <option value="Inventory">Inventory</option>
+      <option value="Products">Products</option>
+      <option value="Orders">Orders</option>
+      <option value="Shipments">Shipments</option>
+      <option value="Sales">Sales</option>
+      <option value="Promotions">Promotions</option>
+      <option value="Users">Users</option>
+      <option value="Auth">Auth</option>
+    </select>
+    <input type="date" class="form-control" id="filterDateFrom" style="width:140px" onchange="loadAuditLog(1)" title="From date"/>
+    <input type="date" class="form-control" id="filterDateTo" style="width:140px" onchange="loadAuditLog(1)" title="To date"/>
+    <button class="btn btn-ghost btn-sm" onclick="clearFilters()"><i class="fas fa-times"></i> Clear</button>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Timestamp</th>
+          <th>User</th>
+          <th>Action</th>
+          <th>Module</th>
+          <th>Resource</th>
+          <th>Detail</th>
+          <th>IP Address</th>
+        </tr>
+      </thead>
+      <tbody id="auditTbody">
+        <tr><td colspan="8" style="text-align:center;padding:32px"><span class="spinner"></span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div id="auditPagWrap" style="padding:0 2px">
+    <div id="auditPagEl"></div>
+  </div>
+</div>
+
+<!-- Detail Modal -->
+<div class="modal-overlay" id="auditDetailModal">
+  <div class="modal" style="max-width:500px">
+    <div class="modal-header">
+      <div class="modal-title"><i class="fas fa-file-lines" style="color:var(--accent)"></i> Event Detail</div>
+      <span class="modal-close" onclick="closeModal('auditDetailModal')"><i class="fas fa-times"></i></span>
+    </div>
+    <div class="modal-body" id="auditDetailBody"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('auditDetailModal')">Close</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const PAGE_SIZE = 20;
+let currentPage = 1;
+let totalRecords = 0;
+let allLogs = [];
+
+// Sample/demo data generator — replace with real API when available
+function generateDemoLogs(n) {
+  const actions  = ['CREATE','UPDATE','DELETE','LOGIN','LOGOUT','VIEW','EXPORT'];
+  const modules  = ['Inventory','Products','Orders','Shipments','Sales','Promotions','Users','Auth'];
+  const users    = ['admin@ifms.app','manager1@ifms.app','manager2@ifms.app','supervisor@ifms.app'];
+  const ips      = ['192.168.1.10','10.0.0.5','192.168.1.22','172.16.0.3'];
+  const details  = {
+    'CREATE':  ['Created new product SKU-{n}','Added inventory record #{n}','Created purchase order PO-{n}','Added new user','Created shipment SHP-{n}'],
+    'UPDATE':  ['Updated stock quantity for SKU-{n}','Modified promotion discount','Updated shipment status to Delivered','Changed user role','Adjusted reorder point'],
+    'DELETE':  ['Deleted product SKU-{n}','Removed inventory record','Cancelled purchase order','Deleted promotion'],
+    'LOGIN':   ['Successful login from web','Login from dashboard portal'],
+    'LOGOUT':  ['Session ended','Manual logout'],
+    'VIEW':    ['Viewed inventory report','Accessed sales dashboard','Viewed audit trail','Opened shipment details'],
+    'EXPORT':  ['Exported inventory CSV','Exported sales report','Downloaded audit log'],
+  };
+  const logs = [];
+  const now = Date.now();
+  for (let i = 0; i < n; i++) {
+    const action = actions[Math.floor(Math.random() * actions.length)];
+    const module = modules[Math.floor(Math.random() * modules.length)];
+    const dArr   = details[action];
+    const detail = dArr[Math.floor(Math.random() * dArr.length)].replace('{n}', String(1000 + i).slice(1));
+    const ts     = new Date(now - i * 1000 * 60 * Math.floor(Math.random() * 30 + 1));
+    logs.push({
+      id:        n - i,
+      timestamp: ts.toISOString(),
+      user:      users[Math.floor(Math.random() * users.length)],
+      action,
+      module,
+      resource:  `${module.slice(0,3).toUpperCase()}-${String(1000+i).slice(1)}`,
+      detail,
+      ip:        ips[Math.floor(Math.random() * ips.length)],
+    });
+  }
+  return logs;
+}
+
+async function loadAuditLog(page = 1) {
+  currentPage = page;
+
+  // Try real API first, fall back to demo
+  let logs = [];
+  try {
+    const params = new URLSearchParams({
+      page,
+      per_page: PAGE_SIZE,
+      action:    document.getElementById('filterAction').value,
+      module:    document.getElementById('filterModule').value,
+      q:         document.getElementById('auditSearch').value,
+      date_from: document.getElementById('filterDateFrom').value,
+      date_to:   document.getElementById('filterDateTo').value,
+    });
+    const res = await fetch('/manager/api/audit-log?' + params);
+    if (res.ok) {
+      const data = await res.json();
+      logs = data.logs || data.records || [];
+      totalRecords = data.total || logs.length;
+      allLogs = logs;
+    } else { throw new Error('API not available'); }
+  } catch(e) {
+    // Demo mode — generate in-memory logs
+    if (allLogs.length === 0) allLogs = generateDemoLogs(150);
+    const q      = document.getElementById('auditSearch').value.toLowerCase();
+    const action = document.getElementById('filterAction').value;
+    const module = document.getElementById('filterModule').value;
+    const dFrom  = document.getElementById('filterDateFrom').value;
+    const dTo    = document.getElementById('filterDateTo').value;
+    let filtered = allLogs.filter(l => {
+      if (action && l.action !== action) return false;
+      if (module && l.module !== module) return false;
+      if (q && !((l.user||'').toLowerCase().includes(q) || (l.detail||'').toLowerCase().includes(q) || (l.resource||'').toLowerCase().includes(q))) return false;
+      if (dFrom && l.timestamp.slice(0,10) < dFrom) return false;
+      if (dTo   && l.timestamp.slice(0,10) > dTo)   return false;
+      return true;
+    });
+    totalRecords = filtered.length;
+    logs = filtered.slice((page-1)*PAGE_SIZE, page*PAGE_SIZE);
+  }
+
+  updateStats();
+  renderTable(logs);
+  renderPagination();
+}
+
+function updateStats() {
+  document.getElementById('statTotal').textContent   = totalRecords.toLocaleString();
+  const creates = allLogs.filter(l=>l.action==='CREATE').length;
+  const updates = allLogs.filter(l=>l.action==='UPDATE').length;
+  const deletes = allLogs.filter(l=>l.action==='DELETE').length;
+  document.getElementById('statCreates').textContent = creates;
+  document.getElementById('statUpdates').textContent = updates;
+  document.getElementById('statDeletes').textContent = deletes;
+  document.getElementById('logCount').textContent    = totalRecords + ' events';
+}
+
+function renderTable(logs) {
+  const tbody = document.getElementById('auditTbody');
+  if (!logs.length) {
+    tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><i class="fas fa-scroll"></i><p>No audit events found</p></div></td></tr>';
+    return;
+  }
+  tbody.innerHTML = logs.map((l, idx) => {
+    const tsStr = l.timestamp || '—';
+    const rowNum = (currentPage-1)*PAGE_SIZE + idx + 1;
+    return `<tr onclick="showDetail(${l.id})" style="cursor:pointer">
+      <td style="color:var(--muted2,#60637a);font-size:.74rem">${rowNum}</td>
+      <td style="font-size:.75rem;white-space:nowrap;color:var(--muted,#8b8fa8)">${tsStr}</td>
+      <td>
+        <div style="display:flex;align-items:center;gap:7px">
+          <div style="width:24px;height:24px;border-radius:50%;background:var(--accent-dim,rgba(232,197,71,.15));display:flex;align-items:center;justify-content:center;font-size:.66rem;font-weight:700;color:var(--accent,#e8c547);flex-shrink:0">${(l.user||'?')[0].toUpperCase()}</div>
+          <span style="font-size:.78rem;max-width:160px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${l.user||'—'}</span>
+        </div>
+      </td>
+      <td><span class="action-badge action-${l.action||''}">${l.action||'—'}</span></td>
+      <td><span class="module-badge">${l.module||'—'}</span></td>
+      <td style="font-family:monospace;font-size:.74rem;color:var(--accent,#e8c547)">${l.resource||'—'}</td>
+      <td class="audit-detail">${l.detail||'—'}</td>
+      <td style="font-family:monospace;font-size:.72rem;color:var(--muted2,#60637a)">${l.ip||'—'}</td>
+    </tr>`;
+  }).join('');
+}
+
+function renderPagination() {
+  const pages = Math.max(1, Math.ceil(totalRecords / PAGE_SIZE));
+  const wrap = document.getElementById('auditPagWrap');
+  wrap.style.display = '';
+  if (pages <= 1) {
+    document.getElementById('auditPagEl').innerHTML = `<span style="font-size:.78rem;color:var(--muted)">${totalRecords} event${totalRecords!==1?'s':''}</span>`;
+    return;
+  }
+  const start=(currentPage-1)*PAGE_SIZE+1, end=Math.min(currentPage*PAGE_SIZE,totalRecords);
+  const range = getPaginationRange(currentPage, pages);
+  let btns='';
+  range.forEach(p=>{
+    if(p==='...') btns+=`<span class="page-btn disabled" style="border:none;background:none;color:var(--muted)">…</span>`;
+    else btns+=`<a class="page-btn${p===currentPage?' active':''}" onclick="loadAuditLog(${p})">${p}</a>`;
+  });
+  document.getElementById('auditPagEl').innerHTML=`
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:10px 0 2px">
+      <span style="font-size:.78rem;color:var(--muted)">Showing <strong style="color:var(--text)">${start}–${end}</strong> of <strong style="color:var(--text)">${totalRecords}</strong> events</span>
+      <div style="display:flex;align-items:center;gap:4px">
+        <button class="page-btn${currentPage===1?' disabled':''}" onclick="loadAuditLog(${currentPage-1})" ${currentPage===1?'disabled':''} title="Prev"><i class="fas fa-chevron-left" style="font-size:.6rem"></i></button>
+        ${btns}
+        <button class="page-btn${currentPage===pages?' disabled':''}" onclick="loadAuditLog(${currentPage+1})" ${currentPage===pages?'disabled':''} title="Next"><i class="fas fa-chevron-right" style="font-size:.6rem"></i></button>
+      </div>
+    </div>`;
+}
+
+function getPaginationRange(cur, total) {
+  if (total <= 7) return Array.from({length:total},(_,i)=>i+1);
+  if (cur <= 4)  return [1,2,3,4,5,'...',total];
+  if (cur >= total-3) return [1,'...',total-4,total-3,total-2,total-1,total];
+  return [1,'...',cur-1,cur,cur+1,'...',total];
+}
+
+function showDetail(id) {
+  const log = allLogs.find(l => l.id === id);
+  if (!log) return;
+  const tsDisplay = log.timestamp || '—';
+  const actionMeta = {
+    CREATE:  {color:'#22c55e', grad:'#14532d,#166534', icon:'fa-plus'},
+    UPDATE:  {color:'#3b82f6', grad:'#1e3a8a,#1d4ed8', icon:'fa-pen'},
+    DELETE:  {color:'#ef4444', grad:'#7f1d1d,#991b1b', icon:'fa-trash'},
+    LOGIN:   {color:'#e8c547', grad:'#713f12,#92400e', icon:'fa-arrow-right-to-bracket'},
+    LOGOUT:  {color:'#8b8fa8', grad:'#1e293b,#334155', icon:'fa-arrow-right-from-bracket'},
+    VIEW:    {color:'#a78bfa', grad:'#2e1065,#4c1d95', icon:'fa-eye'},
+    EXPORT:  {color:'#f97316', grad:'#7c2d12,#9a3412', icon:'fa-download'},
+  };
+  const m = actionMeta[log.action] || actionMeta.VIEW;
+  document.getElementById('auditDetailBody').innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <!-- Hero gradient -->
+      <div style="background:linear-gradient(135deg,${m.grad});border-radius:14px;padding:18px 20px;display:flex;align-items:center;gap:14px">
+        <div style="width:48px;height:48px;border-radius:13px;background:rgba(255,255,255,.18);display:flex;align-items:center;justify-content:center;font-size:1.1rem;color:#fff;flex-shrink:0;backdrop-filter:blur(4px)">
+          <i class="fas ${m.icon}"></i>
+        </div>
+        <div style="flex:1;min-width:0">
+          <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:1rem;font-weight:800;color:#fff">${log.action} — ${log.module}</div>
+          <div style="color:rgba(255,255,255,.6);font-size:.75rem;margin-top:3px">${tsDisplay}</div>
+        </div>
+        <span style="background:rgba(255,255,255,.18);color:#fff;border-radius:20px;padding:4px 12px;font-size:.72rem;font-weight:700;white-space:nowrap;backdrop-filter:blur(4px)">${log.action}</span>
+      </div>
+      <!-- Fields grid -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="view-field">
+          <div class="view-label">User</div>
+          <div class="view-value">${log.user||'—'}</div>
+        </div>
+        <div class="view-field">
+          <div class="view-label">Module</div>
+          <div class="view-value">${log.module||'—'}</div>
+        </div>
+        <div class="view-field">
+          <div class="view-label">Resource</div>
+          <div class="view-value">${log.resource||'—'}</div>
+        </div>
+        <div class="view-field">
+          <div class="view-label">IP Address</div>
+          <div class="view-value" style="font-family:monospace">${log.ip||'—'}</div>
+        </div>
+        <div class="view-field" style="grid-column:1/-1">
+          <div class="view-label">Detail</div>
+          <div class="view-value" style="font-weight:400;line-height:1.6;font-size:.85rem">${log.detail||'—'}</div>
+        </div>
+      </div>
+    </div>`;
+  openModal('auditDetailModal');
+}
+
+function openModal(id)  { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+function clearFilters() {
+  document.getElementById('filterAction').value   = '';
+  document.getElementById('filterModule').value   = '';
+  document.getElementById('auditSearch').value    = '';
+  document.getElementById('filterDateFrom').value = '';
+  document.getElementById('filterDateTo').value   = '';
+  loadAuditLog(1);
+}
+
+function exportLog() {
+  const logs = allLogs;
+  if (!logs.length) { showToast('No data to export', 'error'); return; }
+  const headers = 'ID,Timestamp,User,Action,Module,Resource,Detail,IP';
+  const rows = logs.map(l => [l.id, l.timestamp, l.user, l.action, l.module, l.resource, `"${(l.detail||'').replace(/"/g,'""')}"`, l.ip].join(','));
+  const csv  = [headers, ...rows].join('\n');
+  const blob = new Blob([csv], {type:'text/csv'});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = `audit_log_${new Date().toISOString().slice(0,10)}.csv`; a.click();
+  URL.revokeObjectURL(url);
+  showToast('Audit log exported', 'success');
+}
+
+let debounceTimer;
+function debouncedLoad() { clearTimeout(debounceTimer); debounceTimer = setTimeout(() => loadAuditLog(1), 350); }
+
+// Init
+loadAuditLog(1);
+</script>
+{% endblock %}

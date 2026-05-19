@@ -1,0 +1,94 @@
+{% extends "manager/base.html" %}
+{% block title %}Sales Reports{% endblock %}
+{% block page_title %}<i class="fas fa-chart-line" style="color:var(--accent);margin-right:8px"></i>Sales Reports{% endblock %}
+{% block content %}
+<!-- Summary cards -->
+<div class="stats-grid" id="summaryCards">
+  <div class="stat-card teal"><div class="stat-icon"><i class="fas fa-rupee-sign"></i></div><div><div class="stat-label">Total Revenue</div><div class="stat-value" id="sumRevenue"><span class="spinner"></span></div></div></div>
+  <div class="stat-card green"><div class="stat-icon"><i class="fas fa-shopping-cart"></i></div><div><div class="stat-label">Units Sold</div><div class="stat-value" id="sumUnits"><span class="spinner"></span></div></div></div>
+  <div class="stat-card yellow"><div class="stat-icon"><i class="fas fa-tag"></i></div><div><div class="stat-label">Discounts Given</div><div class="stat-value" id="sumDiscounts"><span class="spinner"></span></div></div></div>
+  <div class="stat-card red"><div class="stat-icon"><i class="fas fa-rotate-left"></i></div><div><div class="stat-label">Returns</div><div class="stat-value" id="sumReturns"><span class="spinner"></span></div></div></div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <div class="card-title"><i class="fas fa-table" style="color:var(--accent)"></i> Sales Transactions</div>
+    <div class="search-bar">
+      <div class="search-input-wrap">
+        <i class="fas fa-search"></i>
+        <input type="text" class="form-control" id="salesSearch" placeholder="Filter by product…" oninput="debounce()"/>
+      </div>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Date</th><th>Product</th><th>Units Sold</th><th>Revenue</th><th>Discounts</th><th>Returns</th></tr></thead>
+      <tbody id="salesTbody">
+        <tr><td colspan="6"><div class="empty-state"><span class="spinner"></span></div></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="pagination" id="pagination"></div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+let currentPage=1; let _d;
+function debounce(){clearTimeout(_d);_d=setTimeout(()=>loadSales(1),350);}
+
+// FIX 5: Non-blocking init
+(function(){ loadSales(1); })();
+
+async function loadSales(page=1){
+  currentPage=page;
+  const q=document.getElementById('salesSearch').value.trim();
+  let url=`/manager/api/sales?page=${page}`;
+  if(q) url+=`&q=${encodeURIComponent(q)}`;
+  document.getElementById('salesTbody').innerHTML='<tr><td colspan="6"><div class="empty-state"><span class="spinner"></span></div></td></tr>';
+  const {ok,data}=await apiFetch(url);
+  if(!ok) return;
+  if(data.summary && page===1){
+    document.getElementById('sumRevenue').textContent='₹'+Number(data.summary.total_revenue||0).toLocaleString('en-IN',{maximumFractionDigits:0});
+    document.getElementById('sumUnits').textContent=Number(data.summary.total_units||0).toLocaleString();
+    document.getElementById('sumDiscounts').textContent='₹'+Number(data.summary.total_discounts||0).toLocaleString('en-IN',{maximumFractionDigits:0});
+    document.getElementById('sumReturns').textContent=Number(data.summary.total_returns||0).toLocaleString();
+  }
+  const tbody=document.getElementById('salesTbody');
+  if(!data.records?.length){tbody.innerHTML='<tr><td colspan="6"><div class="empty-state"><i class="fas fa-chart-line"></i><p>No sales data</p></div></td></tr>';renderPagination(0);return;}
+  tbody.innerHTML=data.records.map(r=>`<tr>
+    <td style="color:var(--muted)">${r.date||'—'}</td>
+    <td style="font-weight:500">${r.product_name||'—'}</td>
+    <td>${r.units_sold||0}</td>
+    <td>₹${Number(r.revenue||0).toLocaleString('en-IN',{maximumFractionDigits:2})}</td>
+    <td style="color:var(--warn)">₹${Number(r.discounts||0).toLocaleString('en-IN',{maximumFractionDigits:2})}</td>
+    <td style="color:var(--danger)">${r.returns||0}</td>
+  </tr>`).join('');
+  renderPagination(data.total||0, data.per_page||20);
+}
+
+function renderPagination(total, perPage=20){
+  // FIX 6: Premium paginator with smart ellipsis
+  const pages=Math.ceil(total/perPage);
+  const el=document.getElementById('pagination');
+  if(pages<=1){el.innerHTML=total?`<span style="font-size:.78rem;color:var(--muted)">${total} records</span>`:'';return;}
+  const delta=2; let range=[],left=currentPage-delta,right=currentPage+delta+1,prev=null;
+  for(let i=1;i<=pages;i++){if(i===1||i===pages||(i>=left&&i<right))range.push(i);}
+  let btns='';
+  range.forEach(i=>{
+    if(prev&&i-prev>1)btns+=`<span class="page-btn disabled" style="border:none;background:none;color:var(--muted)">…</span>`;
+    btns+=`<button class="page-btn${i===currentPage?' active':''}" onclick="loadSales(${i})">${i}</button>`;
+    prev=i;
+  });
+  const start=(currentPage-1)*perPage+1, end=Math.min(currentPage*perPage,total);
+  el.innerHTML=`
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:12px 0 2px">
+      <span style="font-size:.78rem;color:var(--muted)">Showing <strong style="color:var(--text)">${start}–${end}</strong> of <strong style="color:var(--text)">${total}</strong></span>
+      <div style="display:flex;align-items:center;gap:4px">
+        <button class="page-btn${currentPage===1?' disabled':''}" onclick="loadSales(${currentPage-1})" ${currentPage===1?'disabled':''} title="Prev"><i class="fas fa-chevron-left" style="font-size:.6rem"></i></button>
+        ${btns}
+        <button class="page-btn${currentPage===pages?' disabled':''}" onclick="loadSales(${currentPage+1})" ${currentPage===pages?'disabled':''} title="Next"><i class="fas fa-chevron-right" style="font-size:.6rem"></i></button>
+      </div>
+    </div>`;
+}
+</script>
+{% endblock %}

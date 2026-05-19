@@ -1,0 +1,158 @@
+{% extends "analyst/base.html" %}
+{% block title %}Sales Returns{% endblock %}
+{% block page_title %}<i class="fas fa-rotate-left" style="color:var(--green-brand);margin-right:8px"></i>Sales Returns{% endblock %}
+
+{% block content %}
+<!-- Stats bar -->
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px">
+  <div class="card" style="padding:16px 18px;margin:0">
+    <div style="font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;font-weight:600">Total Returns</div>
+    <div style="font-size:1.5rem;font-weight:800;font-family:'Plus Jakarta Sans',sans-serif;color:var(--text);margin-top:4px" id="srStatTotal">—</div>
+  </div>
+  <div class="card" style="padding:16px 18px;margin:0">
+    <div style="font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;font-weight:600">Pending</div>
+    <div style="font-size:1.5rem;font-weight:800;font-family:'Plus Jakarta Sans',sans-serif;color:var(--warn);margin-top:4px" id="srStatPending">—</div>
+  </div>
+  <div class="card" style="padding:16px 18px;margin:0">
+    <div style="font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;font-weight:600">Approved</div>
+    <div style="font-size:1.5rem;font-weight:800;font-family:'Plus Jakarta Sans',sans-serif;color:var(--accent);margin-top:4px" id="srStatApproved">—</div>
+  </div>
+  <div class="card" style="padding:16px 18px;margin:0">
+    <div style="font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;font-weight:600">Total Refund Value</div>
+    <div style="font-size:1.1rem;font-weight:800;font-family:'Plus Jakarta Sans',sans-serif;color:#ef4444;margin-top:4px" id="srStatValue">—</div>
+  </div>
+</div>
+
+<!-- Read-only banner -->
+<div style="background:linear-gradient(135deg,rgba(14,107,63,.08),rgba(239,68,68,.06));border:1px solid rgba(14,107,63,.18);border-radius:12px;padding:13px 18px;margin-bottom:18px;display:flex;align-items:center;gap:12px;font-size:.8rem;color:var(--text)">
+  <i class="fas fa-eye" style="color:var(--green-brand);font-size:1rem"></i>
+  <div><strong>Analyst View</strong> — Read-only access to sales return records. Contact an Admin or Manager to create or action returns.</div>
+</div>
+
+<div class="card">
+  <div class="card-header" style="flex-wrap:wrap;gap:10px">
+    <div style="display:flex;align-items:center;gap:12px">
+      <div class="card-title">Sales Returns</div>
+      <span id="srCount" class="badge badge-blue">—</span>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+      <div style="position:relative">
+        <i class="fas fa-search" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:.8rem"></i>
+        <input type="text" id="srSearch" class="form-control" placeholder="Search SO #, customer…" style="padding-left:32px;width:200px" oninput="debSR()"/>
+      </div>
+      <select class="form-control" id="srStatusFilter" style="width:140px" onchange="loadSRs()">
+        <option value="">All Statuses</option>
+        <option value="Pending">Pending</option>
+        <option value="Approved">Approved</option>
+        <option value="Rejected">Rejected</option>
+      </select>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>#</th><th>Return #</th><th>SO #</th><th>Customer</th><th>Site</th><th>Reason</th><th>Refund</th><th>Date</th><th>Status</th><th>View</th></tr></thead>
+      <tbody id="srTbody"><tr><td colspan="10" style="text-align:center;padding:32px"><span class="spinner"></span></td></tr></tbody>
+    </table>
+  </div>
+  <div id="srPag" style="display:flex;align-items:center;justify-content:space-between;padding:14px 0 0;font-size:.82rem;color:var(--muted)"></div>
+</div>
+
+<!-- VIEW RETURN MODAL (read-only) -->
+<div class="modal-overlay" id="viewSRModal">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-header">
+      <div class="modal-title"><i class="fas fa-eye" style="color:var(--green-brand)"></i>Return Details</div>
+      <span class="modal-close" onclick="closeModal('viewSRModal')"><i class="fas fa-times"></i></span>
+    </div>
+    <div class="modal-body" id="viewSRBody"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('viewSRModal')">Close</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let srPage=1, srTimer=null, srData=[];
+function debSR(){clearTimeout(srTimer);srTimer=setTimeout(()=>loadSRs(1),350);}
+function fmtR(n){n=Number(n)||0;if(n>=1e5)return'₹'+(n/1e5).toFixed(1)+'L';if(n>=1e3)return'₹'+(n/1e3).toFixed(1)+'K';return'₹'+n.toFixed(2);}
+
+async function loadSRs(page=1){
+  srPage=page;
+  const q=document.getElementById('srSearch').value.trim();
+  const status=document.getElementById('srStatusFilter').value;
+  const{ok,data}=await apiFetch(`/analyst/api/sales-returns?page=${page}&q=${encodeURIComponent(q)}&status=${encodeURIComponent(status)}`);
+  if(!ok)return;
+  srData=data.returns||[];
+  document.getElementById('srCount').textContent=data.total||0;
+  const pending=srData.filter(r=>r.status==='Pending').length;
+  const approved=srData.filter(r=>r.status==='Approved').length;
+  const totalRefund=srData.reduce((s,r)=>s+Number(r.total_refund||0),0);
+  document.getElementById('srStatTotal').textContent=data.total||0;
+  document.getElementById('srStatPending').textContent=pending;
+  document.getElementById('srStatApproved').textContent=approved;
+  document.getElementById('srStatValue').textContent=fmtR(totalRefund);
+  const tbody=document.getElementById('srTbody');
+  if(!srData.length){tbody.innerHTML='<tr><td colspan="10"><div class="empty-state"><i class="fas fa-rotate-left"></i><p>No sales returns found</p></div></td></tr>';document.getElementById('srPag').innerHTML='';return;}
+  const SC={Pending:'badge-warn',Approved:'badge-green',Rejected:'badge-red'};
+  tbody.innerHTML=srData.map((r,i)=>`<tr>
+    <td style="color:var(--muted)">${(page-1)*20+i+1}</td>
+    <td><span style="font-family:monospace;font-weight:700;color:var(--accent)">${r.return_number||'—'}</span></td>
+    <td style="font-weight:600">${r.so_number||'—'}</td>
+    <td>${r.customer||'—'}</td>
+    <td><span class="badge badge-blue" style="font-size:.7rem">${r.site||'—'}</span></td>
+    <td style="font-size:.8rem;color:var(--muted);max-width:120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.return_reason||'—'}</td>
+    <td style="font-weight:700;color:#ef4444">${fmtR(r.total_refund||0)}</td>
+    <td style="color:var(--muted);font-size:.8rem">${r.created_at||'—'}</td>
+    <td><span class="badge ${SC[r.status]||'badge-blue'}">${r.status||'—'}</span></td>
+    <td><button class="btn btn-ghost btn-sm btn-icon" onclick="viewSR(${i})" title="View Details"><i class="fas fa-eye" style="color:var(--green-brand)"></i></button></td>
+  </tr>`).join('');
+  renderPag('srPag',page,data.total,20,'loadSRs');
+}
+
+function viewSR(i){
+  const r=srData[i];if(!r)return;
+  const SC={Pending:'var(--warn)',Approved:'var(--accent)',Rejected:'var(--danger)'};
+  const items=Array.isArray(r.items)?r.items:[];
+  document.getElementById('viewSRBody').innerHTML=`
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div style="background:linear-gradient(135deg,#7f1d1d,#991b1b);border-radius:14px;padding:16px 20px;color:#fff;display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-size:.7rem;opacity:.7;margin-bottom:4px">SALES RETURN</div>
+          <div style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:1rem">${r.return_number}</div>
+          <div style="font-size:.75rem;opacity:.75;margin-top:3px">SO: ${r.so_number} · ${r.customer||'—'}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:.65rem;opacity:.7">Refund Amount</div>
+          <div style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:1.4rem">₹${Number(r.total_refund||0).toLocaleString('en-IN',{minimumFractionDigits:2})}</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="view-field"><div class="view-label">Status</div><div class="view-value" style="color:${SC[r.status]||'var(--text)'}">● ${r.status||'—'}</div></div>
+        <div class="view-field"><div class="view-label">Site</div><div class="view-value">${r.site||'—'}</div></div>
+        <div class="view-field"><div class="view-label">Return Reason</div><div class="view-value" style="font-size:.85rem">${r.return_reason||'—'}</div></div>
+        <div class="view-field"><div class="view-label">Created</div><div class="view-value">${r.created_at||'—'}</div></div>
+        ${r.approved_at?`<div class="view-field"><div class="view-label">Approved By</div><div class="view-value">${r.approved_by||'—'}</div></div><div class="view-field"><div class="view-label">Approved At</div><div class="view-value">${r.approved_at}</div></div>`:''}
+      </div>
+      ${items.length?`<div>
+        <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;color:var(--muted2);margin-bottom:8px">Returned Items</div>
+        ${items.map(it=>`<div style="display:flex;justify-content:space-between;padding:8px 12px;background:var(--surface2);border-radius:8px;margin-bottom:6px;font-size:.83rem">
+          <span style="font-weight:600">${it.product_name||it.product_id||'—'}</span>
+          <span>Qty: ${it.quantity||0} × ₹${Number(it.unit_price||0).toFixed(2)}</span>
+        </div>`).join('')}
+      </div>`:''}
+      ${r.notes?`<div class="view-field"><div class="view-label">Notes</div><div class="view-value" style="font-size:.83rem;white-space:pre-wrap">${r.notes}</div></div>`:''}
+      <div style="background:rgba(14,107,63,.07);border:1px solid rgba(14,107,63,.18);border-radius:9px;padding:10px 14px;display:flex;align-items:center;gap:8px;font-size:.75rem;color:var(--green-brand)">
+        <i class="fas fa-lock"></i> Read-only view — contact Admin/Manager to action this return.
+      </div>
+    </div>`;
+  openModal('viewSRModal');
+}
+
+function openModal(id){document.getElementById(id).classList.add('open');}
+function closeModal(id){document.getElementById(id).classList.remove('open');}
+
+loadSRs(1);
+</script>
+{% endblock %}

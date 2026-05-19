@@ -1,0 +1,48 @@
+{% extends "analyst/base.html" %}
+{% block title %}Seasonal Planning{% endblock %}
+{% block page_title %}Seasonal Planning{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header" style="flex-wrap:wrap;gap:12px">
+    <div style="display:flex;align-items:center;gap:10px">
+      <div class="card-title"><i class="fas fa-calendar-days" style="color:#6366f1"></i> Seasonal Plans</div>
+      <span id="spCount" class="badge badge-blue">—</span>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>#</th><th>Month</th><th>Site</th><th>Category</th><th>Forecasted Sales</th><th>Actual Sales</th><th>Seasonal Adj.</th></tr></thead>
+      <tbody id="spTbody"><tr><td colspan="7" style="text-align:center;padding:32px"><span class="spinner"></span></td></tr></tbody>
+    </table>
+  </div>
+  <div id="spPag"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let spPage=1;
+
+async function loadSPs(page=1){
+  spPage=page;
+  const {ok,data}=await apiFetch(`/analyst/api/seasonal-plan-data`);
+  if(!ok)return;
+  const all=Array.isArray(data)?data:(data.records||[]);
+  document.getElementById('spCount').textContent=all.length;
+  const tbody=document.getElementById('spTbody');
+  if(!all.length){tbody.innerHTML='<tr><td colspan="7"><div class="empty-state"><i class="fas fa-calendar-days"></i><p>No seasonal plans found</p></div></td></tr>';document.getElementById('spPag').innerHTML='';return;}
+  tbody.innerHTML=all.map((r,i)=>`<tr>
+    <td style="color:var(--muted)">${i+1}</td>
+    <td style="font-weight:500">${r.month||'—'}</td>
+    <td style="color:var(--muted)">${r.site_id||'All Sites'}</td>
+    <td>${r.category||'—'}</td>
+    <td style="color:#3b82f6;font-weight:600">₹${Number(r.forecast||r.forecasted||0).toLocaleString('en-IN',{maximumFractionDigits:0})}</td>
+    <td style="font-weight:600">₹${Number(r.actual||0).toLocaleString('en-IN',{maximumFractionDigits:0})}</td>
+    <td style="color:var(--warn)">${Number(r.adjustment||0).toLocaleString('en-IN',{maximumFractionDigits:0})}</td>
+  </tr>`).join('');
+  document.getElementById('spPag').innerHTML='';
+}
+loadSPs();
+</script>
+{% endblock %}

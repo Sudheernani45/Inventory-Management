@@ -1,0 +1,49 @@
+{% extends "analyst/base.html" %}
+{% block title %}Audit Log{% endblock %}
+{% block page_title %}Audit Log{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header" style="flex-wrap:wrap;gap:12px">
+    <div style="display:flex;align-items:center;gap:10px">
+      <div class="card-title"><i class="fas fa-scroll" style="color:#6366f1"></i> System Audit Log</div>
+      <span id="auditCount" class="badge badge-blue">—</span>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>#</th><th>Timestamp</th><th>User</th><th>Action</th><th>Module</th><th>Resource</th><th>Detail</th></tr></thead>
+      <tbody id="auditTbody"><tr><td colspan="7" style="text-align:center;padding:32px"><span class="spinner"></span></td></tr></tbody>
+    </table>
+  </div>
+  <div id="auditPag"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let auditPage=1;
+const actionColor={CREATE:'badge-green',UPDATE:'badge-blue',DELETE:'badge-red',LOGIN:'badge-yellow',LOGOUT:'badge-yellow',VIEW:'badge-blue',EXPORT:'badge-blue'};
+
+async function loadAudit(page=1){
+  auditPage=page;
+  const {ok,data}=await apiFetch(`/analyst/api/audit-log?page=${page}`);
+  if(!ok)return;
+  document.getElementById('auditCount').textContent=data.total||0;
+  const tbody=document.getElementById('auditTbody');
+  const rows=data.records||[];
+  if(!rows.length){tbody.innerHTML='<tr><td colspan="7"><div class="empty-state"><i class="fas fa-scroll"></i><p>No audit records</p></div></td></tr>';document.getElementById('auditPag').innerHTML='';return;}
+  tbody.innerHTML=rows.map((r,i)=>`<tr>
+    <td style="color:var(--muted)">${(page-1)*20+i+1}</td>
+    <td style="font-size:.8rem;color:var(--muted)">${r.timestamp||'—'}</td>
+    <td style="font-weight:500">${r.user||'—'}</td>
+    <td><span class="badge ${actionColor[r.action]||'badge-blue'}">${r.action||'—'}</span></td>
+    <td>${r.module||'—'}</td>
+    <td style="font-family:monospace;font-size:.82rem;color:var(--muted)">${r.resource||'—'}</td>
+    <td style="font-size:.82rem;color:var(--muted);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.detail||'—'}</td>
+  </tr>`).join('');
+  renderPag('auditPag',page,data.total,20,'loadAudit');
+}
+loadAudit(1);
+</script>
+{% endblock %}

@@ -1,0 +1,317 @@
+{% extends "manager/base.html" %}
+{% block title %}Dashboard — INVEXA{% endblock %}
+{% block page_title %}<i class="fas fa-gauge-high" style="color:var(--accent);margin-right:8px"></i>Dashboard{% endblock %}
+
+{% block head %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px;}
+@media(max-width:1100px){.kpi-grid{grid-template-columns:1fr 1fr;}}
+@media(max-width:560px){.kpi-grid{grid-template-columns:1fr;}}
+.kpi{background:#fff;border:1px solid var(--border);border-radius:16px;padding:18px 20px;position:relative;overflow:hidden;transition:box-shadow .2s,transform .15s;min-height:110px;}
+.kpi:hover{box-shadow:0 8px 28px rgba(0,0,0,.09);transform:translateY(-2px);}
+.kpi-ico{width:42px;height:42px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:1rem;margin-bottom:10px;}
+.kpi-val{font-family:'Plus Jakarta Sans',sans-serif;font-size:1.75rem;font-weight:800;color:var(--text);line-height:1.1;}
+.kpi-lbl{font-size:.71rem;color:var(--muted);font-weight:500;margin-top:3px;text-transform:uppercase;letter-spacing:.04em;}
+.kpi-tag{position:absolute;top:14px;right:14px;font-size:.66rem;font-weight:700;padding:3px 9px;border-radius:20px;}
+.tag-g{background:rgba(34,197,94,.13);color:#15803d;}
+.tag-r{background:rgba(239,68,68,.13);color:#dc2626;}
+.tag-b{background:rgba(59,130,246,.13);color:#2563eb;}
+.tag-a{background:rgba(245,158,11,.13);color:#b45309;}
+.kpi-bg{position:absolute;bottom:-14px;right:-14px;width:72px;height:72px;border-radius:50%;opacity:.07;}
+/* Welcome */
+.welcome{background:linear-gradient(135deg,#064e28 0%,var(--accent) 60%,#12a05e 100%);border-radius:16px;padding:22px 26px;color:#fff;display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;position:relative;overflow:hidden;flex-wrap:wrap;gap:14px;}
+.welcome::before{content:'';position:absolute;top:-40px;right:-40px;width:160px;height:160px;border-radius:50%;background:rgba(255,255,255,.06);}
+.wbtns{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}
+.wbtn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:9px;font-size:.75rem;font-weight:700;text-decoration:none;border:none;cursor:pointer;}
+/* 5-chart layout */
+.row-top{display:grid;grid-template-columns:62% 38%;gap:14px;margin-bottom:14px;}
+.row-mid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:14px;}
+.row-bot{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;}
+@media(max-width:1050px){.row-top{grid-template-columns:1fr;}.row-mid{grid-template-columns:1fr 1fr;}}
+@media(max-width:700px){.row-mid,.row-bot{grid-template-columns:1fr;}}
+.cc{background:#fff;border:1px solid var(--border);border-radius:16px;padding:18px 20px;box-sizing:border-box;min-height:260px;}
+.cc-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:6px;}
+.cc-t{font-family:'Plus Jakarta Sans',sans-serif;font-size:.86rem;font-weight:700;color:var(--text);display:flex;align-items:center;gap:7px;}
+.cc-sub{font-size:.69rem;color:var(--muted2);background:var(--surface2);border:1px solid var(--border);padding:3px 10px;border-radius:20px;white-space:nowrap;}
+.cc canvas{display:block;width:100%!important;}
+.leg{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;}
+.leg-i{display:flex;align-items:center;gap:5px;font-size:.69rem;color:var(--muted);font-weight:500;}
+.leg-d{width:9px;height:9px;border-radius:3px;flex-shrink:0;}
+.li{display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);}
+.li:last-child{border-bottom:none;}
+.li-ico{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:.72rem;flex-shrink:0;}
+.alt{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:10px;border:1px solid rgba(239,68,68,.18);background:rgba(239,68,68,.04);margin-bottom:7px;}
+.alt:last-child{margin-bottom:0;}
+.sk{background:linear-gradient(90deg,var(--surface2) 25%,var(--border) 50%,var(--surface2) 75%);background-size:400% 100%;animation:sh 1.4s infinite;border-radius:6px;}
+@keyframes sh{0%{background-position:200% 0}100%{background-position:-200% 0}}
+@keyframes blink{0%{opacity:1}100%{opacity:.3}}
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Welcome Banner -->
+<div class="welcome">
+  <div style="position:relative">
+    <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);border-radius:20px;padding:4px 12px;font-size:.7rem;font-weight:600;margin-bottom:8px">
+      <span style="width:7px;height:7px;border-radius:50%;background:#fff;display:inline-block;animation:blink 1.2s infinite alternate"></span>Manager Portal
+    </div>
+    <div style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:1.25rem;margin:0 0 4px;">Welcome, {{ session.get('name','Manager') }} 👋</div>
+    <div style="font-size:.78rem;color:rgba(255,255,255,.7)" id="wSiteName">Loading your data…</div>
+    <div class="wbtns">
+      <a href="/manager/inventory" class="wbtn" style="background:#fff;color:#064e28"><i class="fas fa-warehouse"></i> Inventory</a>
+      <a href="/manager/purchase-orders" class="wbtn" style="background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3)"><i class="fas fa-file-invoice"></i> PO</a>
+      <a href="/manager/sales-orders" class="wbtn" style="background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3)"><i class="fas fa-cart-shopping"></i> SO</a>
+      <a href="/manager/shipments" class="wbtn" style="background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3)"><i class="fas fa-truck-fast"></i> Shipments</a>
+    </div>
+  </div>
+  <div style="text-align:right;flex-shrink:0;position:relative">
+    <div style="font-size:.7rem;color:rgba(255,255,255,.6)">State Revenue</div>
+    <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:2rem;font-weight:800" id="wRevenue">—</div>
+    <div style="font-size:.7rem;color:rgba(255,255,255,.6)" id="wUnits">— units sold</div>
+  </div>
+</div>
+
+<!-- KPI Row -->
+<div class="kpi-grid">
+  <div class="kpi">
+    <div class="kpi-tag tag-b">Revenue</div>
+    <div class="kpi-ico" style="background:rgba(14,107,63,.1);color:var(--accent)"><i class="fas fa-indian-rupee-sign"></i></div>
+    <div class="kpi-val" id="v1">—</div><div class="kpi-lbl">Total Revenue</div>
+    <div class="kpi-bg" style="background:var(--accent)"></div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-tag tag-b">Volume</div>
+    <div class="kpi-ico" style="background:rgba(59,130,246,.1);color:#3b82f6"><i class="fas fa-boxes-stacked"></i></div>
+    <div class="kpi-val" id="v2">—</div><div class="kpi-lbl">Units Sold</div>
+    <div class="kpi-bg" style="background:#3b82f6"></div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-tag tag-r" id="t3">—</div>
+    <div class="kpi-ico" style="background:rgba(239,68,68,.1);color:#ef4444"><i class="fas fa-triangle-exclamation"></i></div>
+    <div class="kpi-val" id="v3">—</div><div class="kpi-lbl">Stockout Items</div>
+    <div class="kpi-bg" style="background:#ef4444"></div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-tag tag-a">Products</div>
+    <div class="kpi-ico" style="background:rgba(168,85,247,.1);color:#a855f7"><i class="fas fa-cube"></i></div>
+    <div class="kpi-val" id="v4">—</div><div class="kpi-lbl">Products</div>
+    <div class="kpi-bg" style="background:#a855f7"></div>
+  </div>
+</div>
+
+<!-- Chart 1+2: Sales Trend + Category/Shipment Donut -->
+<div class="row-top">
+  <div class="cc">
+    <div class="cc-h">
+      <div class="cc-t"><i class="fas fa-chart-line" style="color:#3b82f6"></i>Sales Trend</div>
+      <span class="cc-sub" id="siteLbl">Your State</span>
+    </div>
+    <div style="position:relative;height:200px;width:100%"><canvas id="cSalesTrend" height="200"></canvas></div>
+    <div class="leg">
+      <div class="leg-i"><div class="leg-d" style="background:#3b82f6"></div>Revenue (₹)</div>
+      <div class="leg-i"><div class="leg-d" style="background:#10b981;border-radius:50%"></div>Units Sold</div>
+    </div>
+  </div>
+  <div class="cc">
+    <div class="cc-h">
+      <div class="cc-t"><i class="fas fa-truck" style="color:#14b8a6"></i>Shipment Status</div>
+      <span class="cc-sub">Current</span>
+    </div>
+    <div style="position:relative;height:200px;width:100%"><canvas id="cShipStatus" height="200"></canvas></div>
+    <div class="leg" id="legShip"></div>
+  </div>
+</div>
+
+<!-- Chart 3+4+5: PO Pipeline, Inventory Health, Top Products -->
+<div class="row-mid">
+  <div class="cc">
+    <div class="cc-h">
+      <div class="cc-t"><i class="fas fa-filter" style="color:#6366f1"></i>PO Pipeline</div>
+      <span class="cc-sub">By Status</span>
+    </div>
+    <div style="position:relative;height:180px;width:100%"><canvas id="cOrders" height="180"></canvas></div>
+    <div class="leg" id="legOrders"></div>
+  </div>
+  <div class="cc">
+    <div class="cc-h">
+      <div class="cc-t"><i class="fas fa-warehouse" style="color:#10b981"></i>Inventory Health</div>
+      <span class="cc-sub">Stock status</span>
+    </div>
+    <div style="position:relative;height:180px;width:100%"><canvas id="cInvHealth" height="180"></canvas></div>
+    <div class="leg" id="legInv"></div>
+  </div>
+  <div class="cc">
+    <div class="cc-h">
+      <div class="cc-t"><i class="fas fa-ranking-star" style="color:#f59e0b"></i>Top Products</div>
+      <span class="cc-sub">By Revenue</span>
+    </div>
+    <div style="position:relative;height:180px;width:100%"><canvas id="cTopProd" height="180"></canvas></div>
+  </div>
+</div>
+
+<!-- Row 3: Recent Shipments + Active Alerts -->
+<div class="row-bot">
+  <div class="cc">
+    <div class="cc-h">
+      <div class="cc-t"><i class="fas fa-truck-fast" style="color:#3b82f6"></i>Recent Shipments</div>
+      <a href="/manager/shipments" style="font-size:.7rem;color:var(--accent);font-weight:600;text-decoration:none">View all →</a>
+    </div>
+    <div id="listShipments" style="overflow:auto;max-height:220px"></div>
+  </div>
+  <div class="cc">
+    <div class="cc-h">
+      <div class="cc-t"><i class="fas fa-bell" style="color:#ef4444"></i>Active Alerts</div>
+      <a href="/manager/alerts" style="font-size:.7rem;color:var(--accent);font-weight:600;text-decoration:none">View all →</a>
+    </div>
+    <div id="listAlerts" style="overflow:auto;max-height:220px"></div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+Chart.defaults.font.family="'Inter','Plus Jakarta Sans',sans-serif";
+Chart.defaults.font.size=11;
+Chart.defaults.color='#64748b';
+Chart.defaults.plugins.legend.display=false;
+Chart.defaults.plugins.tooltip.backgroundColor='rgba(15,23,42,.92)';
+Chart.defaults.plugins.tooltip.padding=10;
+Chart.defaults.plugins.tooltip.cornerRadius=8;
+
+const PAL=['#3b82f6','#10b981','#f59e0b','#a855f7','#ef4444','#14b8a6','#6366f1','#ec4899','#f97316','#84cc16'];
+const G='#10b981',B='#3b82f6',AM='#f59e0b',PU='#a855f7',RE='#ef4444',TE='#14b8a6',IN='#6366f1';
+
+function fmtR(n){n=Number(n)||0;if(n>=1e7)return'₹'+(n/1e7).toFixed(1)+'Cr';if(n>=1e5)return'₹'+(n/1e5).toFixed(1)+'L';if(n>=1e3)return'₹'+(n/1e3).toFixed(1)+'K';return'₹'+n.toFixed(0);}
+function fmtN(n){n=Number(n)||0;if(n>=1e6)return(n/1e6).toFixed(1)+'M';if(n>=1e3)return(n/1e3).toFixed(1)+'K';return n.toLocaleString();}
+function ctx(id){const el=document.getElementById(id);return el?el.getContext('2d'):null;}
+const CI={};
+function mkChart(id,cfg){if(CI[id])CI[id].destroy();const c=ctx(id);if(!c)return;CI[id]=new Chart(c,cfg);return CI[id];}
+
+async function loadStats(){
+  const{ok,data}=await apiFetch('/manager/api/stats');if(!ok)return;
+  document.getElementById('v1').textContent=fmtR(data.total_revenue||0);
+  document.getElementById('v2').textContent=fmtN(data.units_sold||0);
+  document.getElementById('v3').textContent=data.stockout_count||0;
+  document.getElementById('v4').textContent=fmtN(data.product_count||0);
+  document.getElementById('wRevenue').textContent=fmtR(data.total_revenue||0);
+  document.getElementById('wUnits').textContent=fmtN(data.units_sold||0)+' units sold';
+  if(data.site_name){document.getElementById('wSiteName').textContent='Managing: '+data.site_name;document.getElementById('siteLbl').textContent=data.site_name;}
+  else document.getElementById('wSiteName').textContent='All States — Full access';
+  const sc=data.stockout_count||0;
+  document.getElementById('t3').textContent=sc>0?sc+' items':'All Clear';
+  document.getElementById('t3').className=sc>0?'kpi-tag tag-r':'kpi-tag tag-g';
+}
+
+async function loadSalesTrend(){
+  const{ok,data}=await apiFetch('/manager/api/recent-sales?mode=trend');if(!ok)return;
+  const recs=(data.records||[]);
+  if(!recs.length)return;
+  const lbl=recs.map(r=>r.date?r.date.slice(0,7):'—');
+  const revVals=recs.map(r=>r.revenue||0);
+  const unitVals=recs.map(r=>r.units_sold||0);
+  mkChart('cSalesTrend',{type:'bar',data:{labels:lbl,datasets:[
+    {label:'Revenue (₹)',data:revVals,backgroundColor:'rgba(59,130,246,.55)',borderColor:B,borderWidth:1.5,borderRadius:4,yAxisID:'y'},
+    {label:'Units Sold',type:'line',data:unitVals,fill:false,borderColor:G,borderWidth:2.5,pointRadius:4,pointBackgroundColor:G,tension:.35,yAxisID:'y2'},
+  ]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+    scales:{
+      y:{grid:{color:'rgba(0,0,0,.05)'},ticks:{callback:v=>fmtR(v)},position:'left',title:{display:true,text:'Revenue',font:{size:9},color:'#8b8fa8'}},
+      y2:{grid:{display:false},ticks:{color:G},position:'right',title:{display:true,text:'Units',font:{size:9},color:G}},
+      x:{grid:{display:false},ticks:{maxTicksLimit:8,font:{size:9}}}
+    },
+    plugins:{legend:{display:true,position:'top',labels:{boxWidth:9,font:{size:10},padding:10}}}}});
+}
+
+async function loadShipStatus(){
+  const{ok,data}=await apiFetch('/manager/api/shipments/stats');if(!ok)return;
+  const CM={Delivered:G,'In Transit':B,Pending:AM,Delayed:RE,Cancelled:'#94a3b8',Dispatched:B,'Out for Delivery':AM,'Picked Up':TE};
+  const counts=data.by_status||{};
+  const lbl=Object.keys(counts).filter(k=>counts[k]>0);
+  const vals=lbl.map(k=>counts[k]);
+  if(!lbl.length)return;
+  mkChart('cShipStatus',{type:'doughnut',data:{labels:lbl,datasets:[{data:vals,backgroundColor:lbl.map(l=>CM[l]||TE),borderWidth:2,borderColor:'#fff'}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'56%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.label}: ${c.raw}`}}}}});
+  const total=vals.reduce((a,b)=>a+b,0)||1;
+  document.getElementById('legShip').innerHTML=lbl.map((l,i)=>`<div class="leg-i"><div class="leg-d" style="background:${CM[l]||TE}"></div>${l}: <strong style="color:var(--text)">${vals[i]}</strong> <span style="color:var(--muted2)">(${((vals[i]/total)*100).toFixed(0)}%)</span></div>`).join('');
+}
+
+async function loadInvHealth(){
+  const{ok,data}=await apiFetch('/manager/api/inventory?per_page=200');if(!ok)return;
+  let inStock=0,low=0,stockout=0;
+  (data.records||[]).forEach(r=>{
+    const cs=Number(r.current_stock||r.ending_inventory||0);
+    const rp=Number(r.reorder_point||0);
+    if(r.stockout_flag==='Yes'||cs<=0)stockout++;
+    else if(rp>0&&cs<=rp)low++;
+    else inStock++;
+  });
+  const vals=[inStock,low,stockout];
+  if(!vals.reduce((a,b)=>a+b,0))return;
+  mkChart('cInvHealth',{type:'doughnut',data:{labels:['In Stock','Low Stock','Stockout'],datasets:[{data:vals,backgroundColor:[G,AM,RE],borderWidth:2,borderColor:'#fff'}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'56%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.label}: ${c.raw} SKUs`}}}}});
+  const total=vals.reduce((a,b)=>a+b,0)||1;
+  document.getElementById('legInv').innerHTML=`
+    <div class="leg-i"><div class="leg-d" style="background:${G}"></div>In Stock <strong style="color:var(--text)">${inStock}</strong></div>
+    <div class="leg-i"><div class="leg-d" style="background:${AM}"></div>Low <strong style="color:var(--text)">${low}</strong></div>
+    <div class="leg-i"><div class="leg-d" style="background:${RE}"></div>Stockout <strong style="color:var(--text)">${stockout}</strong></div>`;
+}
+
+async function loadOrders(){
+  const{ok,data}=await apiFetch('/manager/api/purchase-orders');if(!ok)return;
+  const sm={};
+  (data.records||[]).forEach(r=>{sm[r.status]=(sm[r.status]||0)+1;});
+  const CM={Pending:AM,Approved:G,Received:B,Cancelled:RE,Draft:'#94a3b8'};
+  const lbl=Object.keys(sm);const vals=lbl.map(k=>sm[k]);
+  if(!lbl.length)return;
+  mkChart('cOrders',{type:'bar',data:{labels:lbl,datasets:[{label:'Orders',data:vals,backgroundColor:lbl.map(l=>CM[l]||PU),borderRadius:5}]},
+    options:{responsive:true,maintainAspectRatio:false,scales:{y:{grid:{color:'rgba(0,0,0,.05)'},ticks:{stepSize:1}},x:{grid:{display:false}}},plugins:{legend:{display:false}}}});
+  document.getElementById('legOrders').innerHTML=lbl.map((l,i)=>`<div class="leg-i"><div class="leg-d" style="background:${CM[l]||PU}"></div>${l}: <strong style="color:var(--text)">${vals[i]}</strong></div>`).join('');
+}
+
+async function loadTopProducts(){
+  const{ok,data}=await apiFetch('/manager/api/sales-orders');if(!ok)return;
+  const pm={};
+  (data.records||[]).forEach(r=>{if(r.product_name)pm[r.product_name]=(pm[r.product_name]||0)+(r.total_amount||0);});
+  const entries=Object.entries(pm).sort((a,b)=>b[1]-a[1]).slice(0,6);
+  if(!entries.length)return;
+  const lbl=entries.map(e=>e[0].length>14?e[0].slice(0,12)+'…':e[0]);
+  mkChart('cTopProd',{type:'bar',data:{labels:lbl,datasets:[{label:'Revenue',data:entries.map(e=>e[1]),backgroundColor:entries.map((_,i)=>PAL[i%PAL.length]+'BB'),borderRadius:4,borderSkipped:false}]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,scales:{x:{grid:{color:'rgba(0,0,0,.05)'},ticks:{callback:v=>fmtR(v)}},y:{grid:{display:false},ticks:{font:{size:10}}}},plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>'Rev: '+fmtR(c.raw||0)}}}}});
+}
+
+async function loadShipmentsList(){
+  const{ok,data}=await apiFetch('/manager/api/shipments?per_page=6');if(!ok)return;
+  const sCls={Delivered:'badge-green','In Transit':'badge-blue',Pending:'badge-warn',Delayed:'badge-red',Dispatched:'badge-blue','Out for Delivery':'badge-yellow'};
+  document.getElementById('listShipments').innerHTML=(data.records||[]).map((s,i)=>`
+    <div class="li">
+      <div class="li-ico" style="background:${PAL[i%10]}18;color:${PAL[i%10]}"><i class="fas fa-truck" style="font-size:.68rem"></i></div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:.79rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${s.product_name||'—'}</div>
+        <div style="font-size:.68rem;color:var(--muted2)">${s.site_name||s.site_id||'—'} · ${s.shipment_date||'—'}</div>
+      </div>
+      <span class="badge ${sCls[s.delivery_status]||'badge-blue'}" style="font-size:.66rem;white-space:nowrap">${s.delivery_status||'—'}</span>
+    </div>`).join('')||'<div style="padding:20px;text-align:center;color:var(--muted);font-size:.8rem">No active shipments</div>';
+}
+
+async function loadAlerts(){
+  const{ok,data}=await apiFetch('/manager/api/alerts');if(!ok)return;
+  const items=(data.alerts||[]).slice(0,5);
+  const ico={critical:'fa-exclamation',warning:'fa-triangle-exclamation',info:'fa-info'};
+  const clr={critical:'#ef4444',warning:'#f59e0b',info:'#3b82f6'};
+  document.getElementById('listAlerts').innerHTML=items.length?items.map(a=>`
+    <div class="alt" style="border-color:${clr[a.level]||'#ef4444'}22;background:${clr[a.level]||'#ef4444'}06">
+      <div style="width:30px;height:30px;border-radius:8px;background:${clr[a.level]||'#ef4444'}18;color:${clr[a.level]||'#ef4444'};display:flex;align-items:center;justify-content:center;font-size:.72rem;flex-shrink:0"><i class="fas ${ico[a.level]||'fa-circle-dot'}"></i></div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:.79rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${a.title||'—'}</div>
+        <div style="font-size:.68rem;color:var(--muted2)">${a.message||''}</div>
+      </div>
+      <span style="font-size:.66rem;font-weight:700;color:${clr[a.level]||'#ef4444'};background:${clr[a.level]||'#ef4444'}18;padding:2px 8px;border-radius:20px;white-space:nowrap;text-transform:capitalize">${a.level}</span>
+    </div>`).join('')
+    :'<div style="padding:20px;text-align:center;color:#16a34a;font-size:.8rem"><i class="fas fa-circle-check" style="margin-right:6px"></i>No alerts!</div>';
+}
+
+(async()=>{await Promise.all([loadStats(),loadSalesTrend(),loadShipStatus(),loadInvHealth(),loadOrders(),loadTopProducts(),loadShipmentsList(),loadAlerts()]);})();
+</script>
+{% endblock %}

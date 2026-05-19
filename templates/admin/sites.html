@@ -1,0 +1,443 @@
+{% extends "admin/base.html" %}
+{% block title %}Sites{% endblock %}
+{% block page_title %}Sites{% endblock %}
+
+{% block content %}
+<div class="stats-grid" style="margin-bottom:20px">
+  <div class="stat-card yellow">
+    <div class="stat-icon"><i class="fas fa-store"></i></div>
+    <div><div class="stat-label">Total Sites</div><div class="stat-value" id="statTotal">—</div></div>
+  </div>
+  <div class="stat-card green">
+    <div class="stat-icon"><i class="fas fa-circle-check"></i></div>
+    <div><div class="stat-label">Active</div><div class="stat-value" id="statActive">—</div></div>
+  </div>
+  <div class="stat-card red">
+    <div class="stat-icon"><i class="fas fa-circle-xmark"></i></div>
+    <div><div class="stat-label">Inactive</div><div class="stat-value" id="statInactive">—</div></div>
+  </div>
+  <div class="stat-card blue">
+    <div class="stat-icon"><i class="fas fa-map-location-dot"></i></div>
+    <div><div class="stat-label">Regions</div><div class="stat-value" id="statRegions">—</div></div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <div style="display:flex;align-items:center;gap:10px">
+      <div class="card-title"><i class="fas fa-store" style="color:var(--accent)"></i> All Sites</div>
+      <span id="siteCount" class="badge badge-yellow">—</span>
+    </div>
+    <div style="display:flex;gap:9px;align-items:center;flex-wrap:wrap">
+      <div class="search-box">
+        <i class="fas fa-search"></i>
+        <input type="text" class="form-control" id="siteSearch" placeholder="Search sites…" style="width:200px" oninput="handleSearch()"/>
+      </div>
+      <select class="form-control" id="statusFilter" style="width:130px" onchange="handleSearch()">
+        <option value="">All Status</option>
+        <option value="Active">Active</option>
+        <option value="Inactive">Inactive</option>
+      </select>
+      <button class="btn btn-primary" onclick="openModal('addSiteModal')">
+        <i class="fas fa-plus"></i> Add Site
+      </button>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Site ID</th><th>Name</th><th>Format</th><th>City</th>
+          <th>Status</th><th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="sitesTbody">
+        <tr><td colspan="9" style="text-align:center;padding:32px"><span class="spinner"></span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div id="paginationWrap" style="display:none;padding:0 2px">
+    <div id="paginationEl"></div>
+  </div>
+</div>
+
+<!-- ADD SITE MODAL -->
+<div class="modal-overlay" id="addSiteModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title"><i class="fas fa-plus" style="color:var(--accent)"></i> Add Site</div>
+      <span class="modal-close" onclick="closeModal('addSiteModal')"><i class="fas fa-times"></i></span>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group full">
+          <label class="form-label">Site Name *</label>
+          <input type="text" class="form-control" id="sSiteName" placeholder="Warehouse / store name"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Format</label>
+          <select class="form-control" id="sSiteFormat">
+            <option value="">— Select —</option>
+            <option>Digital</option><option>Fresh</option><option>Smart</option><option>Trends</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">State</label>
+          <select class="form-control" id="sSiteState"><option value="">— Select State —</option></select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Region</label>
+          <input type="text" class="form-control" id="sRegion" placeholder="e.g. South"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">City</label>
+          <input type="text" class="form-control" id="sCity" placeholder="City name"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Store Size (sqft)</label>
+          <input type="number" class="form-control" id="sSize" placeholder="0"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Open Date</label>
+          <input type="date" class="form-control" id="sOpenDate"/>
+        </div>
+        <div class="form-group full">
+          <label class="form-label">Status</label>
+          <select class="form-control" id="sStatus">
+            <option value="Active">Active</option>
+            <option value="Inactive">Inactive</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('addSiteModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveSite()"><i class="fas fa-save"></i> Save Site</button>
+    </div>
+  </div>
+</div>
+
+<!-- VIEW SITE MODAL -->
+<div class="modal-overlay" id="viewSiteModal">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-header">
+      <div class="modal-title"><i class="fas fa-eye" style="color:var(--accent)"></i> Site Details</div>
+      <span class="modal-close" onclick="closeModal('viewSiteModal')"><i class="fas fa-times"></i></span>
+    </div>
+    <div class="modal-body" id="viewSiteBody"></div>
+    <div class="modal-footer"><button class="btn btn-ghost" onclick="closeModal('viewSiteModal')">Close</button></div>
+  </div>
+</div>
+
+<!-- EDIT SITE MODAL -->
+<div class="modal-overlay" id="editSiteModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title"><i class="fas fa-pen" style="color:var(--accent)"></i> Edit Site</div>
+      <span class="modal-close" onclick="closeModal('editSiteModal')"><i class="fas fa-times"></i></span>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="eSiteIdHidden"/>
+      <div class="form-grid">
+        <div class="form-group">
+          <label class="form-label">Site ID</label>
+          <input type="text" class="form-control" id="eSiteId" readonly style="cursor:not-allowed;opacity:.5"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Site Name *</label>
+          <input type="text" class="form-control" id="eSiteName"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Format</label>
+          <select class="form-control" id="eSiteFormat">
+            <option value="">— Select —</option>
+            <option>Digital</option><option>Fresh</option><option>Smart</option><option>Trends</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">State</label>
+          <select class="form-control" id="eSiteState"><option value="">— Select State —</option></select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Region</label>
+          <input type="text" class="form-control" id="eRegion"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">City</label>
+          <input type="text" class="form-control" id="eCity"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Store Size (sqft)</label>
+          <input type="number" class="form-control" id="eSize"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Open Date</label>
+          <input type="date" class="form-control" id="eOpenDate"/>
+        </div>
+        <div class="form-group full">
+          <label class="form-label">Status</label>
+          <select class="form-control" id="eStatus">
+            <option value="Active">Active</option>
+            <option value="Inactive">Inactive</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('editSiteModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="updateSite()"><i class="fas fa-save"></i> Update Site</button>
+    </div>
+  </div>
+</div>
+
+<!-- DELETE MODAL -->
+<div class="modal-overlay" id="deleteSiteModal">
+  <div class="modal" style="max-width:400px">
+    <div class="modal-header">
+      <div class="modal-title"><i class="fas fa-trash" style="color:var(--danger)"></i> Delete Site</div>
+      <span class="modal-close" onclick="closeModal('deleteSiteModal')"><i class="fas fa-times"></i></span>
+    </div>
+    <div class="modal-body">
+      <p style="color:var(--muted);font-size:.86rem;line-height:1.65">
+        Are you sure you want to delete site <strong id="deleteSiteName" style="color:var(--text)"></strong>?
+        This action cannot be undone.
+      </p>
+      <input type="hidden" id="deleteSiteIdHidden"/>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('deleteSiteModal')">Cancel</button>
+      <button class="btn btn-danger" onclick="doDeleteSite()"><i class="fas fa-trash"></i> Delete</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let allSites = [], allStates = [], filteredSites = [];
+const PAGE_SIZE = 10;
+let currentPage = 1;
+
+(async () => { await Promise.all([loadStates(), loadSites()]); })();
+
+async function loadStates() {
+  try {
+    const {ok,data} = await apiFetch('/api/states');
+    if (!ok) return;
+    allStates = data.states || [];
+    const opt = '<option value="">— Select State —</option>' + allStates.map(s=>`<option value="${s.state_id}">${s.state_name}</option>`).join('');
+    document.getElementById('sSiteState').innerHTML = opt;
+  } catch(e) {}
+}
+
+async function loadSites() {
+  try {
+    const {ok,data} = await apiFetch('/api/sites-list');
+    if (!ok) return;
+    allSites = data.sites || [];
+    updateStats();
+    applyFilter();
+  } catch(e) { showToast('Error loading sites','error'); }
+}
+
+function updateStats() {
+  document.getElementById('statTotal').textContent   = allSites.length;
+  document.getElementById('statActive').textContent  = allSites.filter(s=>s.status==='Active').length;
+  document.getElementById('statInactive').textContent= allSites.filter(s=>s.status!=='Active').length;
+  const regions = new Set(allSites.map(s=>s.region).filter(Boolean));
+  document.getElementById('statRegions').textContent = regions.size;
+}
+
+function handleSearch() { currentPage = 1; applyFilter(); }
+
+function applyFilter() {
+  const q  = document.getElementById('siteSearch').value.toLowerCase();
+  const st = document.getElementById('statusFilter').value;
+  filteredSites = allSites.filter(s => {
+    const matchQ  = !q || (s.site_id||'').toLowerCase().includes(q) || (s.site_name||'').toLowerCase().includes(q) || (s.city||'').toLowerCase().includes(q) || (s.region||'').toLowerCase().includes(q);
+    const matchSt = !st || s.status === st;
+    return matchQ && matchSt;
+  });
+  document.getElementById('siteCount').textContent = filteredSites.length + ' sites';
+  renderPage();
+}
+
+function renderPage() {
+  const total = filteredSites.length;
+  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  if (currentPage > pages) currentPage = pages;
+  const start = (currentPage - 1) * PAGE_SIZE;
+  const slice = filteredSites.slice(start, start + PAGE_SIZE);
+
+  const tbody = document.getElementById('sitesTbody');
+  if (!slice.length) {
+    tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><i class="fas fa-store"></i><p>No sites found</p></div></td></tr>';
+  } else {
+    tbody.innerHTML = slice.map(s => `<tr>
+      <td style="font-family:monospace;color:var(--accent);font-weight:700;font-size:.78rem">${s.site_id}</td>
+      <td style="font-weight:600">${s.site_name||'—'}</td>
+      <td>${s.site_format?`<span class="badge badge-purple">${s.site_format}</span>`:'—'}</td>
+      <td>${s.city||'—'}</td>
+      <td><span class="badge ${s.status==='Active'?'badge-green':'badge-gray'}">${s.status||'—'}</span></td>
+      <td>
+        <button class="btn btn-ghost btn-sm btn-icon" onclick="viewSite('${s.site_id}')" title="View"><i class="fas fa-eye" style="color:var(--accent)"></i></button>
+        <button class="btn btn-ghost btn-sm btn-icon" onclick="editSite('${s.site_id}')" title="Edit"><i class="fas fa-pen" style="color:var(--warn)"></i></button>
+        <button class="btn btn-ghost btn-sm btn-icon" onclick="confirmDeleteSite('${s.site_id}','${(s.site_name||'').replace(/'/g,"\\'")}')" title="Delete"><i class="fas fa-trash" style="color:var(--danger)"></i></button>
+      </td>
+    </tr>`).join('');
+  }
+
+  // Pagination
+  const wrap = document.getElementById('paginationWrap');
+  wrap.style.display = pages > 1 ? '' : 'none';
+  if (pages > 1) {
+    renderPagination(pages);
+  }
+}
+
+function renderPagination(pages) {
+  const el = document.getElementById('paginationEl');
+  const total = filteredSites.length;
+  const start = (currentPage-1)*PAGE_SIZE+1, end = Math.min(currentPage*PAGE_SIZE, total);
+  const range = getPaginationRange(currentPage, pages);
+  let btns='';
+  range.forEach(p => {
+    if(p==='...') btns+=`<span class="page-btn disabled" style="border:none;background:none;color:var(--muted)">…</span>`;
+    else btns+=`<a class="page-btn${p===currentPage?' active':''}" onclick="goPage(${p})">${p}</a>`;
+  });
+  el.innerHTML=`
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:10px 0 2px">
+      <span style="font-size:.78rem;color:var(--muted)">Showing <strong style="color:var(--text)">${start}–${end}</strong> of <strong style="color:var(--text)">${total}</strong> sites</span>
+      <div style="display:flex;align-items:center;gap:4px">
+        <button class="page-btn${currentPage===1?' disabled':''}" onclick="goPage(${currentPage-1})" ${currentPage===1?'disabled':''} title="Prev"><i class="fas fa-chevron-left" style="font-size:.6rem"></i></button>
+        ${btns}
+        <button class="page-btn${currentPage===pages?' disabled':''}" onclick="goPage(${currentPage+1})" ${currentPage===pages?'disabled':''} title="Next"><i class="fas fa-chevron-right" style="font-size:.6rem"></i></button>
+      </div>
+    </div>`;
+}
+
+function getPaginationRange(cur, total) {
+  if (total <= 7) return Array.from({length:total},(_,i)=>i+1);
+  if (cur <= 4)  return [1,2,3,4,5,'...',total];
+  if (cur >= total-3) return [1,'...',total-4,total-3,total-2,total-1,total];
+  return [1,'...',cur-1,cur,cur+1,'...',total];
+}
+
+function goPage(p) {
+  const pages = Math.ceil(filteredSites.length / PAGE_SIZE);
+  if (p < 1 || p > pages) return;
+  currentPage = p;
+  renderPage();
+  document.querySelector('.card').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function viewSite(sid) {
+  const s = allSites.find(x=>x.site_id===sid); if (!s) return;
+  document.getElementById('viewSiteBody').innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <!-- Hero -->
+      <div style="background:linear-gradient(135deg,var(--green-deep) 0%,#1a7a5e 100%);border-radius:14px;padding:18px 20px;display:flex;align-items:center;gap:14px">
+        <div style="width:50px;height:50px;border-radius:13px;background:rgba(255,255,255,.18);display:flex;align-items:center;justify-content:center;font-size:1.3rem;font-weight:800;color:#fff;flex-shrink:0;backdrop-filter:blur(4px)">
+          ${(s.site_name||'?')[0].toUpperCase()}
+        </div>
+        <div style="flex:1;min-width:0">
+          <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:1rem;font-weight:800;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${s.site_name||'—'}</div>
+          <div style="font-family:monospace;font-size:.78rem;color:rgba(255,255,255,.65);margin-top:2px">${s.site_id}</div>
+        </div>
+        ${s.site_format?`<span style="background:rgba(255,255,255,.18);color:#fff;border-radius:20px;padding:4px 12px;font-size:.72rem;font-weight:700;backdrop-filter:blur(4px)">${s.site_format}</span>`:''}
+        <span style="background:${s.status==='Active'?'rgba(74,222,128,.2)':'rgba(255,255,255,.1)'};color:${s.status==='Active'?'#4ade80':'rgba(255,255,255,.7)'};border-radius:20px;padding:4px 12px;font-size:.72rem;font-weight:700">${s.status||'—'}</span>
+      </div>
+      <!-- Detail grid -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="view-field">
+          <div class="view-label">City</div>
+          <div class="view-value">${s.city||'—'}</div>
+        </div>
+        <div class="view-field">
+          <div class="view-label">Region</div>
+          <div class="view-value">${s.region||'—'}</div>
+        </div>
+        <div class="view-field">
+          <div class="view-label">Store Size</div>
+          <div class="view-value">${s.store_size?Number(s.store_size).toLocaleString()+' sqft':'—'}</div>
+        </div>
+        <div class="view-field">
+          <div class="view-label">Open Date</div>
+          <div class="view-value">${s.open_date||'—'}</div>
+        </div>
+      </div>
+    </div>`;
+  openModal('viewSiteModal');
+}
+
+function openModal(id)  { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+function editSite(sid) {
+  const s = allSites.find(x=>x.site_id===sid); if (!s) return;
+  document.getElementById('eSiteIdHidden').value = sid;
+  document.getElementById('eSiteId').value    = s.site_id||'';
+  document.getElementById('eSiteName').value  = s.site_name||'';
+  document.getElementById('eRegion').value    = s.region||'';
+  document.getElementById('eCity').value      = s.city||'';
+  document.getElementById('eSize').value      = s.store_size||'';
+  document.getElementById('eOpenDate').value  = s.open_date||'';
+  document.getElementById('eSiteFormat').value= s.site_format||'';
+  document.getElementById('eStatus').value    = s.status||'Active';
+  const stateSel = document.getElementById('eSiteState');
+  stateSel.innerHTML = '<option value="">— Select State —</option>' +
+    allStates.map(st=>`<option value="${st.state_id}"${st.state_id==s.state_id?' selected':''}>${st.state_name}</option>`).join('');
+  openModal('editSiteModal');
+}
+
+async function updateSite() {
+  const sid = document.getElementById('eSiteIdHidden').value;
+  const site_name = document.getElementById('eSiteName').value.trim();
+  if (!site_name) { showToast('Site Name is required','error'); return; }
+  try {
+    const {ok,data} = await apiFetch(`/admin/sites/${sid}/edit`,{method:'POST',body:JSON.stringify({
+      site_name, site_format:document.getElementById('eSiteFormat').value,
+      state_id:document.getElementById('eSiteState').value||null,
+      region:document.getElementById('eRegion').value, city:document.getElementById('eCity').value,
+      store_size:document.getElementById('eSize').value, open_date:document.getElementById('eOpenDate').value,
+      status:document.getElementById('eStatus').value
+    })});
+    if (ok && data.status==='success') { closeModal('editSiteModal'); showToast(data.message||'Site updated','success'); await loadSites(); }
+    else showToast(data.message||'Error updating site','error');
+  } catch(e) { showToast('Error updating site','error'); }
+}
+
+function confirmDeleteSite(sid, name) {
+  document.getElementById('deleteSiteIdHidden').value = sid;
+  document.getElementById('deleteSiteName').textContent = name||sid;
+  openModal('deleteSiteModal');
+}
+
+async function doDeleteSite() {
+  const sid = document.getElementById('deleteSiteIdHidden').value;
+  try {
+    const {ok,data} = await apiFetch(`/admin/sites/${sid}/delete`,{method:'POST'});
+    if (ok && data.status==='success') { closeModal('deleteSiteModal'); showToast(data.message||'Site deleted','success'); await loadSites(); }
+    else showToast(data.message||'Error deleting site','error');
+  } catch(e) { showToast('Error deleting site','error'); }
+}
+
+async function saveSite() {
+  const site_name = document.getElementById('sSiteName').value.trim();
+  if (!site_name) { showToast('Site Name is required','error'); return; }
+  const auto_id = 'WH' + String(allSites.length + 1).padStart(3,'0');
+  document.getElementById('sSiteId').value = auto_id;
+  try {
+    const {ok,data} = await apiFetch('/admin/sites/add',{method:'POST',body:JSON.stringify({
+      site_id:auto_id, site_name, site_format:document.getElementById('sSiteFormat').value,
+      state_id:document.getElementById('sSiteState').value||null,
+      region:document.getElementById('sRegion').value, city:document.getElementById('sCity').value,
+      store_size:document.getElementById('sSize').value, open_date:document.getElementById('sOpenDate').value,
+      status:document.getElementById('sStatus').value
+    })});
+    if (ok && data.status==='success') { closeModal('addSiteModal'); showToast(data.message,'success'); await loadSites(); }
+    else showToast(data.message||'Error','error');
+  } catch(e) { showToast('Error saving site','error'); }
+}
+</script>
+{% endblock %}

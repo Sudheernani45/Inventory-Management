@@ -1,0 +1,476 @@
+{% extends "admin/base.html" %}
+{% block title %}User Management{% endblock %}
+{% block page_title %}<i class="fas fa-users" style="color:var(--accent);margin-right:8px"></i>User Management{% endblock %}
+
+{% block content %}
+<!--In this code i need some changes i don't want primary site selection by default in add new user & edit modal upgrade the below code-->
+<div class="card">
+  <div class="card-header">
+    <div style="display:flex;align-items:center;gap:12px">
+      <div class="card-title">All Users</div>
+      <span id="userCount" class="badge badge-blue">—</span>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <div class="search-box">
+        <i class="fas fa-search"></i>
+        <input type="text" class="form-control" id="userSearch" placeholder="Search users…" style="width:220px" oninput="filterUsers()"/>
+      </div>
+      <button class="btn btn-primary" onclick="openAddModal()">
+        <i class="fas fa-user-plus"></i> Add User
+      </button>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table id="usersTable">
+      <thead>
+        <tr>
+          <th>#</th><th>Name</th><th>Email</th><th>Role</th><th>Assigned To</th><th>Status</th><th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="usersTbody">
+        <tr><td colspan="7" style="text-align:center;padding:32px"><span class="spinner"></span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ── ADD USER MODAL ── -->
+<div class="modal-overlay" id="addModal">
+  <div class="modal" style="max-width:580px">
+    <div class="modal-header">
+      <div class="modal-title"><i class="fas fa-user-plus" style="color:var(--accent)"></i>Add New User</div>
+      <span class="modal-close" onclick="closeModal('addModal')"><i class="fas fa-times"></i></span>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group">
+          <label class="form-label">Full Name *</label>
+          <input type="text" class="form-control" id="addName" placeholder="Enter full name"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Email *</label>
+          <input type="email" class="form-control" id="addEmail" placeholder="Enter email"/>
+        </div>
+        <!-- Here i don't want primary site selection label by selectin manage show only assign state -->
+        <div class="form-group full">
+          <label class="form-label">Role *</label>
+          <select class="form-control" id="addRole" onchange="handleRoleChange('add')">
+            <option value="">— Select Role —</option>
+            <option value="manager">Manager</option>
+            <option value="analyst">Analyst</option>
+          </select>
+        </div>
+
+        <!-- Manager: pick state first, then site -->
+        <div class="form-group" id="addStateGroup" style="display:none">
+          <label class="form-label">Assign State *</label>
+          <select class="form-control" id="addState" onchange="loadSitesForState('add')">
+            <option value="">— Select State —</option>
+          </select>
+          <span class="form-hint">Manager oversees all sites in this state</span>
+        </div>
+        <div class="form-group" id="addSiteGroup" style="display:none">
+          <label class="form-label">Fence Site <span style="color:var(--muted2);font-weight:400">(optional)</span></label>
+          <select class="form-control" id="addSite">
+            <option value="">— Select State First —</option>
+          </select>
+          <span class="form-hint">Specific site scope for this manager</span>
+        </div>
+      </div>
+      <div class="info-box">
+        <i class="fas fa-circle-info"></i>
+        <span>A temporary password will be auto-generated and shown after saving.</span>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('addModal')">Cancel</button>
+      <button class="btn btn-primary" id="addSaveBtn" onclick="saveNewUser()">
+        <i class="fas fa-save"></i> Save User
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ── VIEW USER MODAL ── -->
+<div class="modal-overlay" id="viewModal">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-header">
+      <div class="modal-title"><i class="fas fa-eye" style="color:var(--accent)"></i>User Details</div>
+      <span class="modal-close" onclick="closeModal('viewModal')"><i class="fas fa-times"></i></span>
+    </div>
+    <div class="modal-body" id="viewModalBody"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('viewModal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── EDIT USER MODAL ── -->
+<div class="modal-overlay" id="editModal">
+  <div class="modal" style="max-width:580px">
+    <div class="modal-header">
+      <div class="modal-title"><i class="fas fa-user-pen" style="color:var(--warn)"></i>Edit User</div>
+      <span class="modal-close" onclick="closeModal('editModal')"><i class="fas fa-times"></i></span>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="editUserId"/>
+      <div class="form-grid">
+        <div class="form-group">
+          <label class="form-label">Full Name *</label>
+          <input type="text" class="form-control" id="editName"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Email *</label>
+          <input type="email" class="form-control" id="editEmail"/>
+        </div>
+        <div class="form-group full">
+          <label class="form-label">Role</label>
+          <select class="form-control" id="editRole" onchange="handleRoleChange('edit')">
+            <option value="manager">Manager</option>
+            <option value="analyst">Analyst</option>
+          </select>
+        </div>
+        <div class="form-group" id="editStateGroup" style="display:none">
+          <label class="form-label">Assign State</label>
+          <select class="form-control" id="editState" onchange="loadSitesForState('edit')">
+            <option value="">— Select State —</option>
+          </select>
+        </div>
+        <div class="form-group" id="editSiteGroup" style="display:none">
+          <label class="form-label">Fence Site <span style="color:var(--muted2);font-weight:400">(optional)</span></label>
+          <select class="form-control" id="editSite">
+            <option value="">— None —</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost btn-sm" onclick="resetPasswordForUser()" style="margin-right:auto">
+        <i class="fas fa-key"></i> Reset Password
+      </button>
+      <button class="btn btn-ghost" onclick="closeModal('editModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveEditUser()">
+        <i class="fas fa-save"></i> Update
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ── DELETE CONFIRM ── -->
+<div class="modal-overlay" id="deleteModal">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header">
+      <div class="modal-title" style="color:var(--danger)"><i class="fas fa-trash"></i>Delete User</div>
+      <span class="modal-close" onclick="closeModal('deleteModal')"><i class="fas fa-times"></i></span>
+    </div>
+    <div class="modal-body">
+      <p style="color:var(--muted)">Are you sure you want to delete <strong id="deleteUserName" style="color:var(--text)"></strong>? This action cannot be undone.</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('deleteModal')">Cancel</button>
+      <button class="btn btn-danger" onclick="confirmDelete()"><i class="fas fa-trash"></i> Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── TEMP PASSWORD MODAL ── -->
+<div class="modal-overlay" id="pwdModal">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header">
+      <div class="modal-title" style="color:var(--accent3)"><i class="fas fa-key"></i>Temporary Password</div>
+      <span class="modal-close" onclick="closeModal('pwdModal')"><i class="fas fa-times"></i></span>
+    </div>
+    <div class="modal-body">
+      <div style="text-align:center;padding:10px 0 16px">
+        <div style="width:56px;height:56px;border-radius:50%;background:rgba(14,107,63,.1);display:flex;align-items:center;justify-content:center;margin:0 auto 12px;font-size:1.5rem;color:var(--accent)"><i class="fas fa-envelope-circle-check"></i></div>
+        <div style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:700;font-size:.95rem;color:var(--text);margin-bottom:6px">User Created Successfully</div>
+        <p style="color:var(--muted);font-size:.82rem;margin-bottom:14px">A temporary password has been generated and sent directly to the user's email address for security.</p>
+        <div id="pwdEmailStatus" style="font-size:.8rem;font-weight:600;padding:10px 16px;border-radius:10px;background:rgba(14,107,63,.08);color:var(--accent);border:1px solid rgba(14,107,63,.2)"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" onclick="closeModal('pwdModal')">Done</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let allUsers = [];
+let allStates = [];
+let deleteTargetId = null;
+
+(async () => {
+  await Promise.all([loadUsers(), loadStates()]);
+})();
+
+// ── Load Users ──
+async function loadUsers() {
+  try {
+    const { ok, data } = await apiFetch('/api/users');
+    if (!ok) { showToast('Failed to load users', 'error'); return; }
+    allUsers = data.users || [];
+    document.getElementById('userCount').textContent = allUsers.length;
+    renderUsers(allUsers);
+  } catch (e) { showToast('Error loading users', 'error'); }
+}
+
+// ── Load States ──
+async function loadStates() {
+  try {
+    const { ok, data } = await apiFetch('/api/states');
+    if (!ok) return;
+    allStates = data.states || [];
+    const opts = '<option value="">— Select State —</option>' +
+      allStates.map(s => `<option value="${s.state_id}">${s.state_name}</option>`).join('');
+    document.getElementById('addState').innerHTML = opts;
+    document.getElementById('editState').innerHTML = opts;
+  } catch (e) {}
+}
+
+// ── Load Sites for State ──
+async function loadSitesForState(prefix) {
+  const stateId = document.getElementById(prefix + 'State').value;
+  const siteSel = document.getElementById(prefix + 'Site');
+  if (!stateId) {
+    siteSel.innerHTML = '<option value="">— Select State First —</option>';
+    return;
+  }
+  try {
+    const { ok, data } = await apiFetch(`/api/sites-by-state/${stateId}`);
+    if (!ok) return;
+    siteSel.innerHTML = '<option value="">— None —</option>' +
+      data.sites.map(s => `<option value="${s.site_id}">${s.site_name}${s.city ? ' · ' + s.city : ''}</option>`).join('');
+  } catch (e) {}
+}
+
+// ── Handle Role Change ──
+function handleRoleChange(prefix) {
+  const role = document.getElementById(prefix + 'Role').value;
+  const isManager = role === 'manager';
+  document.getElementById(prefix + 'StateGroup').style.display = isManager ? '' : 'none';
+  document.getElementById(prefix + 'SiteGroup').style.display  = 'none'; // Site selection hidden by default
+}
+
+// ── Render Users ──
+function renderUsers(users) {
+  const tbody = document.getElementById('usersTbody');
+  if (!users.length) {
+    tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><i class="fas fa-users"></i><p>No users found</p></div></td></tr>';
+    return;
+  }
+  tbody.innerHTML = users.map((u, i) => {
+    const roleClass = { admin: 'badge-purple', manager: 'badge-blue', analyst: 'badge-green' }[u.role] || 'badge-gray';
+    const assignedTo = u.role === 'manager'
+      ? (u.site_name ? `<span style="font-size:.78rem">${u.site_name}</span>` : '<span style="color:var(--muted);font-size:.78rem">No site assigned</span>')
+      : '<span style="color:var(--muted)">—</span>';
+    const statusBadge = u.role === 'admin'
+      ? '<span class="badge badge-purple">Admin</span>'
+      : (u.is_first_login ? '<span class="badge badge-yellow">First Login</span>' : '<span class="badge badge-green">Active</span>');
+    const isAdmin = u.role === 'admin';
+    return `<tr>
+      <td style="color:var(--muted)">${i + 1}</td>
+      <td>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:700;color:#fff;flex-shrink:0">${(u.name || '?')[0].toUpperCase()}</div>
+          <span style="font-weight:500">${u.name || '—'}</span>
+        </div>
+      </td>
+      <td style="color:var(--muted)">${u.email || '—'}</td>
+      <td><span class="badge ${roleClass}">${u.role}</span></td>
+      <td>${assignedTo}</td>
+      <td>${statusBadge}</td>
+      <td>
+        <div style="display:flex;gap:5px">
+          <button class="btn btn-ghost btn-sm btn-icon" onclick="viewUser(${u.id})" title="View">
+            <i class="fas fa-eye" style="color:var(--accent)"></i>
+          </button>
+          ${!isAdmin ? `
+          <button class="btn btn-ghost btn-sm btn-icon" onclick="editUser(${u.id})" title="Edit">
+            <i class="fas fa-user-pen" style="color:var(--warn)"></i>
+          </button>
+          <button class="btn btn-ghost btn-sm btn-icon" onclick="openDeleteModal(${u.id},'${(u.name || '').replace(/'/g, "\\'")}')">
+            <i class="fas fa-trash" style="color:var(--danger)"></i>
+          </button>` : '<span style="color:var(--muted);font-size:.72rem;padding:0 4px">Protected</span>'}
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+// ── Filter ──
+function filterUsers() {
+  const q = document.getElementById('userSearch').value.toLowerCase();
+  renderUsers(allUsers.filter(u =>
+    (u.name || '').toLowerCase().includes(q) ||
+    (u.email || '').toLowerCase().includes(q) ||
+    (u.role || '').toLowerCase().includes(q)
+  ));
+}
+
+// ── Modal helpers ──
+function openModal(id)  { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+// ── Add User ──
+function openAddModal() {
+  document.getElementById('addName').value  = '';
+  document.getElementById('addEmail').value = '';
+  document.getElementById('addRole').value  = '';
+  document.getElementById('addState').value = '';
+  document.getElementById('addSite').innerHTML = '<option value="">— Select State First —</option>';
+  document.getElementById('addStateGroup').style.display = 'none';
+  document.getElementById('addSiteGroup').style.display  = 'none';
+  openModal('addModal');
+}
+
+async function saveNewUser() {
+  const name    = document.getElementById('addName').value.trim();
+  const email   = document.getElementById('addEmail').value.trim();
+  const role    = document.getElementById('addRole').value;
+  const site_id = document.getElementById('addSite').value;
+
+  if (!name || !email || !role) { showToast('Please fill all required fields', 'error'); return; }
+  if (role === 'manager' && !document.getElementById('addState').value) {
+    showToast('Please select a state for the manager', 'error'); return;
+  }
+
+  const btn = document.getElementById('addSaveBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Saving…';
+  try {
+    const { ok, data } = await apiFetch('/admin/users/add', {
+      method: 'POST',
+      body: JSON.stringify({ name, email, role, site_id })
+    });
+    if (ok && data.status === 'success') {
+      closeModal('addModal');
+      document.getElementById('pwdEmailStatus').textContent = data.email_sent
+        ? '✅ Password sent to user\'s email address.' : '⚠️ Email delivery failed — ask your email administrator to check SMTP settings.';
+      openModal('pwdModal');
+      await loadUsers();
+      showToast('User created successfully', 'success');
+    } else {
+      showToast(data.message || 'Failed to create user', 'error');
+    }
+  } catch (e) { showToast('Error creating user', 'error'); }
+  finally { btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Save User'; }
+}
+
+// ── View User ──
+function viewUser(id) {
+  const u = allUsers.find(x => x.id === id); if (!u) return;
+  const roleClass = { admin: 'badge-purple', manager: 'badge-blue', analyst: 'badge-green' }[u.role] || 'badge-gray';
+  document.getElementById('viewModalBody').innerHTML = `
+    <div style="display:flex;flex-direction:column;align-items:center;gap:14px;padding-bottom:18px;border-bottom:1px solid var(--border);margin-bottom:18px">
+      <div style="width:68px;height:68px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-size:1.7rem;font-weight:800;color:#fff;box-shadow:0 4px 16px rgba(79,70,229,.3)">${(u.name || '?')[0].toUpperCase()}</div>
+      <div style="text-align:center">
+        <div style="font-family:'Space Grotesk',sans-serif;font-size:1.1rem;font-weight:700">${u.name}</div>
+        <div style="color:var(--muted);font-size:.83rem;margin-top:2px">${u.email}</div>
+      </div>
+      <span class="badge ${roleClass}" style="font-size:.78rem;padding:4px 14px">${u.role}</span>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div style="background:var(--surface2);border-radius:8px;padding:12px">
+        <div style="color:var(--muted);font-size:.68rem;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">User ID</div>
+        <div style="font-weight:600">#${u.id}</div>
+      </div>
+      <div style="background:var(--surface2);border-radius:8px;padding:12px">
+        <div style="color:var(--muted);font-size:.68rem;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Assigned Site</div>
+        <div style="font-weight:500">${u.site_name || '—'}</div>
+      </div>
+      <div style="background:var(--surface2);border-radius:8px;padding:12px;grid-column:1/-1">
+        <div style="color:var(--muted);font-size:.68rem;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">Account Status</div>
+        <div>${u.is_first_login ? '<span class="badge badge-yellow">First Login Pending</span>' : '<span class="badge badge-green">Active</span>'}</div>
+      </div>
+    </div>`;
+  openModal('viewModal');
+}
+
+// ── Edit User ──
+async function editUser(id) {
+  const u = allUsers.find(x => x.id === id); if (!u) return;
+  document.getElementById('editUserId').value = u.id;
+  document.getElementById('editName').value   = u.name  || '';
+  document.getElementById('editEmail').value  = u.email || '';
+  document.getElementById('editRole').value   = u.role  || 'manager';
+
+  // Show/hide state+site groups
+  handleRoleChange('edit');
+
+  if (u.role === 'manager') {
+    // If user has a site, find its state and pre-select
+    if (u.site_id) {
+      try {
+        const { ok, data } = await apiFetch('/api/sites-list');
+        if (ok) {
+          const site = (data.sites || []).find(s => s.site_id === u.site_id);
+          // We need state_id from site — fetch all states then match via site list
+          // Pre-populate state dropdown then load sites
+          // Find state that contains this site
+          const { ok: ok2, data: d2 } = await apiFetch(`/api/states`);
+          if (ok2 && d2.states) {
+            // Try each state until we find a match
+            for (const st of d2.states) {
+              const r = await apiFetch(`/api/sites-by-state/${st.state_id}`);
+              if (r.ok && r.data.sites.find(s => s.site_id === u.site_id)) {
+                document.getElementById('editState').value = st.state_id;
+                await loadSitesForState('edit');
+                document.getElementById('editSite').value = u.site_id;
+                break;
+              }
+            }
+          }
+        }
+      } catch(e) {}
+    }
+  }
+  openModal('editModal');
+}
+
+async function saveEditUser() {
+  const id      = document.getElementById('editUserId').value;
+  const name    = document.getElementById('editName').value.trim();
+  const email   = document.getElementById('editEmail').value.trim();
+  const role    = document.getElementById('editRole').value;
+  const site_id = document.getElementById('editSite').value;
+  if (!name || !email) { showToast('Name and email are required', 'error'); return; }
+  try {
+    const { ok, data } = await apiFetch(`/admin/users/${id}/edit`, {
+      method: 'POST',
+      body: JSON.stringify({ name, email, role, site_id })
+    });
+    if (ok && data.status === 'success') {
+      closeModal('editModal'); await loadUsers(); showToast('User updated', 'success');
+    } else { showToast(data.message || 'Update failed', 'error'); }
+  } catch (e) { showToast('Error updating user', 'error'); }
+}
+
+// ── Reset Password ──
+async function resetPasswordForUser() {
+  const id = document.getElementById('editUserId').value;
+  // proceed
+  try {
+    const { ok, data } = await apiFetch(`/admin/users/${id}/reset-password`, { method: 'POST' });
+    if (ok && data.status === 'success') {
+      closeModal('editModal');
+      document.getElementById('pwdEmailStatus').textContent = data.email_sent ? '✅ New password sent to user\'s email address.' : '⚠️ Email delivery failed — check SMTP settings.';
+      openModal('pwdModal');
+    } else { showToast(data.message || 'Reset failed', 'error'); }
+  } catch (e) { showToast('Error', 'error'); }
+}
+
+// ── Delete ──
+function openDeleteModal(id, name) { deleteTargetId = id; document.getElementById('deleteUserName').textContent = name; openModal('deleteModal'); }
+async function confirmDelete() {
+  if (!deleteTargetId) return;
+  try {
+    const { ok, data } = await apiFetch(`/admin/users/${deleteTargetId}/delete`, { method: 'POST' });
+    if (ok && data.status === 'success') { closeModal('deleteModal'); await loadUsers(); showToast('User deleted', 'success'); }
+    else showToast(data.message || 'Delete failed', 'error');
+  } catch (e) { showToast('Error deleting user', 'error'); }
+  deleteTargetId = null;
+}
+</script>
+{% endblock %}

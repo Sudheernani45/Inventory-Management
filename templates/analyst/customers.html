@@ -1,0 +1,54 @@
+{% extends "analyst/base.html" %}
+{% block title %}Customers{% endblock %}
+{% block page_title %}Customers{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header" style="flex-wrap:wrap;gap:12px">
+    <div style="display:flex;align-items:center;gap:10px">
+      <div class="card-title"><i class="fas fa-user-group" style="color:#6366f1"></i> All Customers</div>
+      <span id="custCount" class="badge badge-blue">—</span>
+    </div>
+    <div style="position:relative">
+      <i class="fas fa-search" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:.8rem"></i>
+      <input type="text" id="custSearch" class="form-control" placeholder="Search customer ID…" style="padding-left:32px;width:200px" oninput="debounce()"/>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>#</th><th>Customer ID</th><th>Age</th><th>Gender</th><th>Income Bracket</th><th>Avg Spend</th><th>Total Spend</th></tr></thead>
+      <tbody id="custTbody"><tr><td colspan="7" style="text-align:center;padding:32px"><span class="spinner"></span></td></tr></tbody>
+    </table>
+  </div>
+  <div id="custPag"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let custPage=1, custTimer=null;
+function debounce(){clearTimeout(custTimer);custTimer=setTimeout(()=>loadCustomers(1),300);}
+
+async function loadCustomers(page=1){
+  custPage=page;
+  const q=document.getElementById('custSearch').value.trim();
+  const {ok,data}=await apiFetch(`/analyst/api/customers?page=${page}&q=${encodeURIComponent(q)}`);
+  if(!ok)return;
+  document.getElementById('custCount').textContent=data.total||0;
+  const tbody=document.getElementById('custTbody');
+  const rows=data.records||[];
+  if(!rows.length){tbody.innerHTML='<tr><td colspan="9"><div class="empty-state"><i class="fas fa-user-group"></i><p>No customers found</p></div></td></tr>';document.getElementById('custPag').innerHTML='';return;}
+  tbody.innerHTML=rows.map((r,i)=>`<tr>
+    <td style="color:var(--muted)">${(page-1)*20+i+1}</td>
+    <td style="font-weight:600;font-family:monospace">${r.customer_id||'—'}</td>
+    <td>${r.age||'—'}</td>
+    <td>${r.gender||'—'}</td>
+    <td><span class="badge badge-blue">${r.income_bracket||'—'}</span></td>
+    <td style="font-weight:600">₹${Number(r.average_spend||0).toLocaleString('en-IN',{maximumFractionDigits:0})}</td>
+    <td style="font-weight:600;color:var(--accent)">₹${Number(r.total_spend||0).toLocaleString('en-IN',{maximumFractionDigits:0})}</td>
+  </tr>`).join('');
+  renderPag('custPag',page,data.total,20,'loadCustomers');
+}
+loadCustomers(1);
+</script>
+{% endblock %}

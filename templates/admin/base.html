@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>INVEXA Admin — {% block title %}{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/theme.css') }}"/>
+  <style>
+    /* Global search bar in topbar */
+    .topbar-search{position:relative;display:flex;align-items:center}
+    .topbar-search i{position:absolute;left:12px;color:var(--muted2);font-size:.82rem;pointer-events:none}
+    .topbar-search input{background:var(--surface2);border:1.5px solid var(--border);border-radius:22px;padding:7px 14px 7px 36px;font-size:.8rem;color:var(--text);width:220px;font-family:'Inter',sans-serif;transition:all .15s}
+    .topbar-search input:focus{outline:none;border-color:var(--green-brand);background:#fff;box-shadow:0 0 0 3px rgba(14,107,63,.08);width:260px}
+    .topbar-search input::placeholder{color:var(--muted2)}
+    /* Hamburger */
+    .hamburger{display:none;background:none;border:none;cursor:pointer;padding:8px;color:var(--text);font-size:1.1rem;border-radius:8px;transition:background .14s}
+    .hamburger:hover{background:var(--surface2)}
+    .sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:99;backdrop-filter:blur(2px)}
+    @media(max-width:768px){
+      .hamburger{display:flex;align-items:center;justify-content:center}
+      .sidebar{transform:translateX(-100%);transition:transform .25s ease;z-index:200}
+      .sidebar.open{transform:translateX(0)}
+      .sidebar-overlay.open{display:block}
+      .main{margin-left:0!important}
+      .topbar-search{display:none}
+    }
+    .hide-sm{display:inline}
+    @media(max-width:540px){.hide-sm{display:none}}
+    /* Sidebar scrollbar */
+    .sidebar{overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--border) transparent}
+    .sidebar::-webkit-scrollbar{width:5px}
+    .sidebar::-webkit-scrollbar-track{background:transparent}
+    .sidebar::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
+    .sidebar::-webkit-scrollbar-thumb:hover{background:var(--muted2)}
+    .nav-section{flex:1;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--border) transparent}
+    .nav-section::-webkit-scrollbar{width:4px}
+    .nav-section::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
+  
+/* ── Global No Horizontal Scroll ── */
+*, *::before, *::after { box-sizing: border-box; }
+html, body { overflow-x: hidden; max-width: 100vw; }
+.main { overflow-x: hidden; }
+.content { overflow-x: hidden; max-width: 100%; }
+.row2, .row3, .row4, .kpi-grid, .sum-bar, .ig-grid, .insight-grid, .health-grid {
+  min-width: 0;
+  width: 100%;
+}
+.cc, .kpi, .sm, .ig { min-width: 0; }
+canvas { max-width: 100% !important; }
+
+/* ── Mobile Responsive ── */
+@media(max-width:768px){
+  :root{--sidebar-w:0px;}
+  .sidebar{transform:translateX(-100%);transition:transform .25s ease;z-index:200;position:fixed;}
+  .sidebar.mobile-open{transform:translateX(0);}
+  .main{margin-left:0!important;max-width:100vw;}
+  .topbar{padding:0 14px;}
+  .content{padding:14px;}
+  .kpi-grid,.sum-bar,.ig-grid{grid-template-columns:1fr 1fr!important;}
+  .row2,.row3,.row4{grid-template-columns:1fr!important;}
+  table{font-size:.74rem;}
+  .modal{margin:12px;max-height:94vh;}
+  .stat-card-row{grid-template-columns:1fr 1fr!important;}
+}
+@media(max-width:420px){
+  .kpi-grid,.sum-bar{grid-template-columns:1fr!important;}
+}
+/* Mobile hamburger btn */
+.mobile-menu-btn{display:none;background:none;border:none;cursor:pointer;padding:8px;color:var(--text);font-size:1.1rem;}
+@media(max-width:768px){.mobile-menu-btn{display:flex;align-items:center;justify-content:center;}}
+.sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:199;}
+.sidebar-overlay.show{display:block;}
+.view-field{background:var(--surface2);border-radius:10px;padding:10px 13px;border:1px solid var(--border);}
+.view-label{font-size:.68rem;color:var(--muted2);text-transform:uppercase;letter-spacing:.07em;font-weight:600;margin-bottom:3px;}
+.view-value{font-size:.88rem;font-weight:600;color:var(--text);}
+</style>
+  {% block head %}{% endblock %}
+</head>
+<body class="role-admin">
+
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-icon"><i class="fas fa-boxes-stacked" style="font-size:.85rem"></i></div>
+    <div>
+      <span class="logo-text">INVEXA</span>
+      <span class="logo-sub">Admin Console</span>
+    </div>
+  </div>
+  <nav class="nav-section">
+    <div class="nav-label">Overview</div>
+    <a class="nav-item {% if request.endpoint == 'admin.dashboard' %}active{% endif %}" href="/admin/dashboard">
+      <div class="nav-icon"><i class="fas fa-gauge-high"></i></div> Dashboard
+    </a>
+    <div class="nav-label">Management</div>
+    <a class="nav-item {% if request.endpoint == 'admin.users' %}active{% endif %}" href="/admin/users">
+      <div class="nav-icon"><i class="fas fa-users"></i></div> Users
+    </a>
+    <a class="nav-item {% if request.endpoint == 'admin.products' %}active{% endif %}" href="/admin/products">
+      <div class="nav-icon"><i class="fas fa-boxes-stacked"></i></div> Products
+    </a>
+    <a class="nav-item {% if request.endpoint == 'admin.sites' %}active{% endif %}" href="/admin/sites">
+      <div class="nav-icon"><i class="fas fa-store"></i></div> Sites
+    </a>
+    <a class="nav-item {% if request.endpoint == 'admin.customers_page' %}active{% endif %}" href="/admin/customers">
+      <div class="nav-icon"><i class="fas fa-user-group"></i></div> Customers
+    </a>
+    <div class="nav-label">Operations</div>
+    <a class="nav-item {% if request.endpoint == 'admin.inventory' %}active{% endif %}" href="/admin/inventory">
+      <div class="nav-icon"><i class="fas fa-warehouse"></i></div> Inventory
+    </a>
+    <a class="nav-item {% if request.endpoint == 'admin.shipments' %}active{% endif %}" href="/admin/shipments">
+      <div class="nav-icon"><i class="fas fa-truck-fast"></i></div> Logistics
+    </a>
+    <a class="nav-item {% if request.endpoint == 'admin.suppliers_page' %}active{% endif %}" href="/admin/suppliers-list">
+      <div class="nav-icon"><i class="fas fa-truck-ramp-box"></i></div> Suppliers
+    </a>
+    <div class="nav-label">Orders</div>
+    <a class="nav-item {% if request.endpoint == 'admin.sales_orders' %}active{% endif %}" href="/admin/sales-orders">
+      <div class="nav-icon"><i class="fas fa-cart-shopping"></i></div> Sales Orders
+    </a>
+    <a class="nav-item {% if request.endpoint == 'admin.purchase_orders' %}active{% endif %}" href="/admin/purchase-orders">
+      <div class="nav-icon"><i class="fas fa-file-invoice"></i></div> Purchase Orders
+    </a>
+    <a class="nav-item {% if request.endpoint == 'admin.sales_returns_page' %}active{% endif %}" href="/admin/sales-returns">
+      <div class="nav-icon"><i class="fas fa-rotate-left"></i></div> Sales Returns
+    </a>
+    <a class="nav-item {% if request.endpoint == 'admin.purchase_returns_page' %}active{% endif %}" href="/admin/purchase-returns">
+      <div class="nav-icon"><i class="fas fa-boxes-packing"></i></div> Purchase Returns
+    </a>
+    <div class="nav-label">System</div>
+    <a class="nav-item {% if request.endpoint == 'admin.promotions' %}active{% endif %}" href="/admin/promotions">
+      <div class="nav-icon"><i class="fas fa-tag"></i></div> Promotions
+    </a>
+    <a class="nav-item {% if request.endpoint == 'admin.contact_messages' %}active{% endif %}" href="/admin/messages" style="position:relative">
+      <div class="nav-icon"><i class="fas fa-envelope"></i></div> Messages
+      <span id="navMsgBadge" style="display:none;position:absolute;right:12px;top:50%;transform:translateY(-50%);background:var(--danger);color:#fff;border-radius:99px;font-size:.62rem;font-weight:700;padding:2px 6px;min-width:16px;text-align:center"></span>
+    </a>
+    <a class="nav-item {% if request.endpoint == 'admin.audit_log_page' %}active{% endif %}" href="/admin/audit-log">
+      <div class="nav-icon"><i class="fas fa-scroll"></i></div> Audit Log
+    </a>
+  </nav>
+  <div class="sidebar-user">
+    <div class="user-avatar" id="avatarInitial">A</div>
+    <div class="user-info">
+      <div class="name" id="sidebarUsername">Admin</div>
+      <div class="role">Administrator</div>
+    </div>
+    <div class="logout-btn" onclick="logout()" title="Sign Out" style="display:flex;align-items:center;gap:5px;font-size:.74rem;font-weight:600;padding:6px 9px"><i class="fas fa-arrow-right-from-bracket"></i><span>Sign Out</span></div>
+  </div>
+</aside>
+
+<div class="main">
+  <div class="topbar">
+    <div style="display:flex;align-items:center;gap:10px">
+      <button class="hamburger" onclick="openSidebar()" aria-label="Menu"><i class="fas fa-bars"></i></button>
+      <div class="page-heading">{% block page_title %}{% endblock %}</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px">
+      
+      <a href="/home" class="topbar-home"><i class="fas fa-house"></i> <span class="hide-sm">Home</span></a>
+      <div class="topbar-user">
+        <div class="topbar-avatar" id="topbarAvatar">A</div>
+        <span class="topbar-name hide-sm" id="topbarUsername">Admin</span>
+        <span class="badge-role hide-sm">Admin</span>
+      </div>
+    </div>
+  </div>
+  <div class="content">{% block content %}{% endblock %}</div>
+</div>
+
+<div id="toast-container"></div>
+
+<script>
+function showToast(msg, type='info') {
+  const icons={success:'fa-circle-check',error:'fa-circle-exclamation',info:'fa-circle-info'};
+  const colors={success:'var(--success)',error:'var(--danger)',info:'var(--info)'};
+  const t=document.createElement('div'); t.className=`toast ${type}`;
+  t.innerHTML=`<i class="fas ${icons[type]}" style="color:${colors[type]};font-size:.9rem"></i><span>${msg}</span>`;
+  document.getElementById('toast-container').appendChild(t);
+  setTimeout(()=>{t.style.opacity='0';t.style.transform='translateX(12px)';t.style.transition='.22s';setTimeout(()=>t.remove(),240);},3200);
+}
+async function apiFetch(url,options={}) {
+  const res=await fetch(url,{headers:{'Content-Type':'application/json'},...options});
+  const ct=res.headers.get('content-type')||'';
+  if(!ct.includes('application/json')){
+    console.error('apiFetch: expected JSON but got',ct,'from',url);
+    return {ok:false,status:res.status,data:{}};
+  }
+  const data=await res.json(); return {ok:res.ok,status:res.status,data};
+}
+async function logout(){window.location.href='/logout';}
+// ── Unread messages badge ──────────────────────────────────
+(async function loadMsgBadge(){
+  try {
+    const {ok,data} = await apiFetch('/admin/api/messages/unread-count');
+    if(ok && data.count > 0){
+      const b = document.getElementById('navMsgBadge');
+      if(b){ b.textContent = data.count > 9 ? '9+' : data.count; b.style.display=''; }
+    }
+  } catch(e){}
+})();
+function openSidebar(){document.getElementById('sidebar').classList.add('open');document.getElementById('sidebarOverlay').classList.add('open');}
+function closeSidebar(){document.getElementById('sidebar').classList.remove('open');document.getElementById('sidebarOverlay').classList.remove('open');}
+// ── FIX 1: Preserve sidebar scroll position across navigation ──────────────
+(function(){
+  const SIDEBAR_KEY='ifms_sidebar_scroll';
+  const sidebar=document.getElementById('sidebar');
+  const navSection=sidebar.querySelector('.nav-section');
+  if(!navSection) return;
+  // Restore saved scroll
+  const saved=sessionStorage.getItem(SIDEBAR_KEY);
+  if(saved) navSection.scrollTop=parseInt(saved,10)||0;
+  // Save scroll before navigating away
+  document.querySelectorAll('.nav-item').forEach(link=>{
+    link.addEventListener('click',function(e){
+      sessionStorage.setItem(SIDEBAR_KEY, navSection.scrollTop);
+    });
+  });
+})();
+// ── GLOBAL SEARCH BAR: filters any visible table on the page ──────────────
+let _gsTimer=null;
+function doGlobalSearch(){
+  clearTimeout(_gsTimer);
+  _gsTimer = setTimeout(_runGlobalSearch, 180);
+}
+function _runGlobalSearch(){
+  const inp = document.getElementById('globalSearch');
+  if(!inp) return;
+  const q = (inp.value||'').trim().toLowerCase();
+  _clearGlobalSearch(false);  // reset first without clearing input
+
+  if(!q){ _clearSearchBadge(); return; }
+
+  // Collect all real data rows (skip empty-state rows)
+  const rows = Array.from(document.querySelectorAll('table tbody tr')).filter(r=>{
+    // skip loading/empty rows that have only 1 cell or spinner
+    if(r.cells.length<=1) return false;
+    if(r.querySelector('.empty-state,.spinner,span.spinner')) return false;
+    return true;
+  });
+
+  if(!rows.length){
+    // Maybe data isn't loaded yet — show toast guidance
+    showToast('Tip: search runs on the currently visible table','info');
+    return;
+  }
+
+  let matched=0;
+  rows.forEach(row=>{
+    // Build text from each cell individually so concatenation artifacts don't cause false hits
+    const text = Array.from(row.cells).map(c=>c.textContent.toLowerCase()).join(' ');
+    const show  = text.includes(q);
+    row.style.display = show ? '' : 'none';
+    if(show) matched++;
+  });
+
+  // Result badge
+  let badge=document.getElementById('globalSearchBadge');
+  if(!badge){
+    badge=document.createElement('div');
+    badge.id='globalSearchBadge';
+    badge.style.cssText='position:absolute;top:42px;left:0;right:0;background:var(--surface);border:1.5px solid var(--accent);border-radius:10px;padding:5px 12px;font-size:.72rem;color:var(--text);white-space:nowrap;box-shadow:0 4px 16px rgba(0,0,0,.1);z-index:200;display:flex;align-items:center;gap:6px';
+    document.querySelector('.topbar-search').appendChild(badge);
+  }
+  const pct = rows.length ? Math.round(matched/rows.length*100) : 0;
+  badge.innerHTML=`<i class="fas fa-search" style="color:var(--accent);font-size:.7rem"></i> <strong style="color:var(--accent)">${matched}</strong> of ${rows.length} rows match <em style="color:var(--muted)">"${q}"</em> <span style="margin-left:auto;cursor:pointer;color:var(--muted)" onclick="clearGlobalSearch()">✕ clear</span>`;
+  badge.style.display='flex';
+}
+
+function _clearGlobalSearch(clearInput=true){
+  document.querySelectorAll('table tbody tr').forEach(r=>r.style.display='');
+  if(clearInput){
+    const inp=document.getElementById('globalSearch');
+    if(inp) inp.value='';
+  }
+  _clearSearchBadge();
+}
+function _clearSearchBadge(){
+  const badge=document.getElementById('globalSearchBadge');
+  if(badge) badge.style.display='none';
+}
+function clearGlobalSearch(){ _clearGlobalSearch(true); const el=document.getElementById('globalSearch'); if(el) el.focus(); }
+
+const _gsInput = document.getElementById('globalSearch');
+if(_gsInput){
+  _gsInput.addEventListener('input', function(){
+    if(!this.value.trim()) _clearGlobalSearch(false);
+    else doGlobalSearch();
+  });
+  _gsInput.addEventListener('keydown', function(e){
+    if(e.key==='Escape') clearGlobalSearch();
+  });
+}
+(async()=>{
+  try{
+    const res=await fetch('/api/me');
+    if(res.ok){const u=await res.json();const name=u.name||'Admin';const init=name[0].toUpperCase();
+      document.getElementById('sidebarUsername').textContent=name;
+      document.getElementById('topbarUsername').textContent=name;
+      document.getElementById('avatarInitial').textContent=init;
+      const ta=document.getElementById('topbarAvatar');if(ta)ta.textContent=init;}
+  }catch(e){}
+})();
+</script>
+<!-- ── FIX 6: Universal premium pagination renderer ── -->
+<script>
+function renderPag(elId, page, total, pp, fn) {
+  const pages = Math.ceil(total / pp);
+  const el = document.getElementById(elId);
+  if (!el) return;
+  if (pages <= 1) {
+    el.innerHTML = `<span style="font-size:.78rem;color:var(--muted)">${total} record${total!==1?'s':''}</span>`;
+    return;
+  }
+  const start = (page-1)*pp+1, end = Math.min(page*pp, total);
+  // Build page number array with ellipsis
+  const delta=2; let range=[], left=page-delta, right=page+delta+1, l;
+  for(let i=1;i<=pages;i++){if(i===1||i===pages||(i>=left&&i<right))range.push(i);}
+  let btns=''; let prev=null;
+  range.forEach(i=>{
+    if(prev&&i-prev>1) btns+=`<span class="page-btn disabled" style="border:none;background:none;color:var(--muted)">…</span>`;
+    btns+=`<button class="page-btn${i===page?' active':''}" onclick="${fn}(${i})" aria-label="Page ${i}">${i}</button>`;
+    prev=i;
+  });
+  el.innerHTML=`
+    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:space-between;padding:14px 0 4px">
+      <span style="font-size:.78rem;color:var(--muted)">Showing <strong style="color:var(--text)">${start}–${end}</strong> of <strong style="color:var(--text)">${total}</strong></span>
+      <div style="display:flex;align-items:center;gap:4px">
+        <button class="page-btn${page===1?' disabled':''}" onclick="${fn}(${page-1})" ${page===1?'disabled':''} title="Previous"><i class="fas fa-chevron-left" style="font-size:.6rem"></i></button>
+        ${btns}
+        <button class="page-btn${page===pages?' disabled':''}" onclick="${fn}(${page+1})" ${page===pages?'disabled':''} title="Next"><i class="fas fa-chevron-right" style="font-size:.6rem"></i></button>
+      </div>
+    </div>`;
+}
+// ── FIX 7: Smart toast — only show critical/success toasts, suppress routine info ──
+const _origShowToast = showToast;
+window.showToast = function(msg, type='info') {
+  // Filter out low-priority info toasts
+  if(type==='info') {
+    const lm=(msg||'').toLowerCase();
+    const important = lm.includes('error')||lm.includes('fail')||lm.includes('warning')||
+                      lm.includes('stock')||lm.includes('alert')||lm.includes('critical')||
+                      lm.includes('tip:');
+    if(!important) return; // suppress
+  }
+  _origShowToast(msg, type);
+};
+</script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

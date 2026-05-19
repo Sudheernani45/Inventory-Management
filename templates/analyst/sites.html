@@ -1,0 +1,54 @@
+{% extends "analyst/base.html" %}
+{% block title %}Sites{% endblock %}
+{% block page_title %}Sites{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header" style="flex-wrap:wrap;gap:12px">
+    <div style="display:flex;align-items:center;gap:10px">
+      <div class="card-title"><i class="fas fa-store" style="color:#6366f1"></i> All Sites</div>
+      <span id="siteCount" class="badge badge-blue">—</span>
+    </div>
+    <div style="position:relative">
+      <i class="fas fa-search" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:.8rem"></i>
+      <input type="text" id="siteSearch" class="form-control" placeholder="Search site…" style="padding-left:32px;width:200px" oninput="debounce()"/>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>#</th><th>Site ID</th><th>Site Name</th><th>Format</th><th>Region</th><th>City</th><th>Status</th></tr></thead>
+      <tbody id="siteTbody"><tr><td colspan="7" style="text-align:center;padding:32px"><span class="spinner"></span></td></tr></tbody>
+    </table>
+  </div>
+  <div id="sitePag"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let sitePage=1, siteTimer=null;
+function debounce(){clearTimeout(siteTimer);siteTimer=setTimeout(()=>loadSites(1),300);}
+
+async function loadSites(page=1){
+  sitePage=page;
+  const q=document.getElementById('siteSearch').value.trim();
+  const {ok,data}=await apiFetch(`/analyst/api/sites?page=${page}&q=${encodeURIComponent(q)}`);
+  if(!ok)return;
+  document.getElementById('siteCount').textContent=data.total||0;
+  const tbody=document.getElementById('siteTbody');
+  const rows=data.records||[];
+  if(!rows.length){tbody.innerHTML='<tr><td colspan="7"><div class="empty-state"><i class="fas fa-store"></i><p>No sites found</p></div></td></tr>';document.getElementById('sitePag').innerHTML='';return;}
+  tbody.innerHTML=rows.map((r,i)=>`<tr>
+    <td style="color:var(--muted)">${(page-1)*20+i+1}</td>
+    <td style="font-weight:600;font-family:monospace">${r.site_id||'—'}</td>
+    <td style="font-weight:500">${r.site_name||'—'}</td>
+    <td>${r.site_format||'—'}</td>
+    <td style="color:var(--muted)">${r.region||'—'}</td>
+    <td style="color:var(--muted)">${r.city||'—'}</td>
+    <td><span class="badge ${r.status==='Active'?'badge-green':'badge-red'}">${r.status||'—'}</span></td>
+  </tr>`).join('');
+  renderPag('sitePag',page,data.total,20,'loadSites');
+}
+loadSites(1);
+</script>
+{% endblock %}

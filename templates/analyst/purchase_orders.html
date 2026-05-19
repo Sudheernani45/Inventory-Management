@@ -1,0 +1,59 @@
+{% extends "analyst/base.html" %}
+{% block title %}Purchase Orders{% endblock %}
+{% block page_title %}Purchase Orders{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header" style="flex-wrap:wrap;gap:12px">
+    <div style="display:flex;align-items:center;gap:10px">
+      <div class="card-title"><i class="fas fa-file-invoice" style="color:#6366f1"></i> Purchase Orders</div>
+      <span id="poCount" class="badge badge-blue">—</span>
+    </div>
+    <div style="position:relative">
+      <i class="fas fa-search" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:.8rem"></i>
+      <input type="text" id="poSearch" class="form-control" placeholder="Search PO number…" style="padding-left:32px;width:200px" oninput="debounce()"/>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>#</th><th>PO Number</th><th>Supplier</th><th>Product</th><th>Qty</th><th>Unit Cost</th><th>Total Cost</th><th>Site</th><th>Expected Delivery</th><th>Status</th></tr></thead>
+      <tbody id="poTbody"><tr><td colspan="10" style="text-align:center;padding:32px"><span class="spinner"></span></td></tr></tbody>
+    </table>
+  </div>
+  <div id="poPag"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let poPage=1, poTimer=null;
+function debounce(){clearTimeout(poTimer);poTimer=setTimeout(()=>loadPOs(1),300);}
+
+const poStatusColor={Draft:'badge-yellow',Pending:'badge-yellow',Approved:'badge-blue',Received:'badge-green',Cancelled:'badge-red'};
+
+async function loadPOs(page=1){
+  poPage=page;
+  const q=document.getElementById('poSearch').value.trim();
+  const {ok,data}=await apiFetch(`/analyst/api/purchase-orders?page=${page}&q=${encodeURIComponent(q)}`);
+  if(!ok)return;
+  document.getElementById('poCount').textContent=data.total||0;
+  const tbody=document.getElementById('poTbody');
+  const rows=data.records||[];
+  if(!rows.length){tbody.innerHTML='<tr><td colspan="10"><div class="empty-state"><i class="fas fa-file-invoice"></i><p>No purchase orders found</p></div></td></tr>';document.getElementById('poPag').innerHTML='';return;}
+  tbody.innerHTML=rows.map((r,i)=>`<tr>
+    <td style="color:var(--muted)">${(page-1)*20+i+1}</td>
+    <td style="font-weight:700;font-family:monospace">${r.po_number||'—'}</td>
+    <td>${r.supplier||'—'}</td>
+    <td style="font-weight:500">${r.product_name||'—'}</td>
+    <td>${r.quantity||0}</td>
+    <td>₹${Number(r.unit_cost||0).toLocaleString('en-IN',{maximumFractionDigits:2})}</td>
+    <td style="font-weight:600;color:var(--accent)">₹${Number(r.total_cost||0).toLocaleString('en-IN',{maximumFractionDigits:0})}</td>
+    <td style="color:var(--muted)">${r.site||'—'}</td>
+    <td style="color:var(--muted)">${r.expected_delivery||'—'}</td>
+    <td><span class="badge ${poStatusColor[r.status]||'badge-blue'}">${r.status||'—'}</span></td>
+  </tr>`).join('');
+  renderPag('poPag',page,data.total,20,'loadPOs');
+}
+loadPOs(1);
+</script>
+{% endblock %}

@@ -1,0 +1,212 @@
+{% extends "admin/base.html" %}
+{% block title %}Inventory{% endblock %}
+{% block page_title %}<i class="fas fa-warehouse" style="color:var(--accent);margin-right:8px"></i>Inventory{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header" style="flex-wrap:wrap;gap:10px">
+    <div style="display:flex;align-items:center;gap:12px">
+      <div class="card-title">Inventory Records</div>
+      <span id="invCount" class="badge badge-blue">—</span>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+      <div style="position:relative">
+        <i class="fas fa-search" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:.8rem"></i>
+        <input type="text" id="invSearch" class="form-control" placeholder="Search product…" style="padding-left:32px;width:180px" oninput="debounceLoad()"/>
+      </div>
+      <select class="form-control" id="invSiteFilter" style="width:160px" onchange="loadInventory()">
+        <option value="">All Sites</option>
+      </select>
+      <select class="form-control" id="invStockoutFilter" style="width:140px" onchange="loadInventory()">
+        <option value="">All Stock</option>
+        <option value="yes">Stockout Only</option>
+      </select>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>#</th><th>Product</th><th>Site</th><th>Starting Inv.</th><th>Replenishment</th><th>Ending Inv. (Calc)</th><th>Current Stock</th><th>Status</th><th>Actions</th></tr></thead>
+      <tbody id="invTbody">
+        <tr class="skeleton-row"><td><div class="skeleton" style="height:13px;width:30px"></div></td><td><div class="skeleton" style="height:13px"></div></td><td><div class="skeleton" style="height:13px;width:80%"></div></td><td><div class="skeleton" style="height:13px;width:60%"></div></td><td><div class="skeleton" style="height:13px;width:60%"></div></td><td><div class="skeleton" style="height:22px;width:60px;border-radius:20px"></div></td><td><div class="skeleton" style="height:28px;width:36px;border-radius:8px"></div></td></tr>
+        <tr class="skeleton-row"><td><div class="skeleton" style="height:13px;width:30px"></div></td><td><div class="skeleton" style="height:13px"></div></td><td><div class="skeleton" style="height:13px;width:80%"></div></td><td><div class="skeleton" style="height:13px;width:60%"></div></td><td><div class="skeleton" style="height:13px;width:60%"></div></td><td><div class="skeleton" style="height:22px;width:60px;border-radius:20px"></div></td><td><div class="skeleton" style="height:28px;width:36px;border-radius:8px"></div></td></tr>
+        <tr class="skeleton-row"><td><div class="skeleton" style="height:13px;width:30px"></div></td><td><div class="skeleton" style="height:13px"></div></td><td><div class="skeleton" style="height:13px;width:80%"></div></td><td><div class="skeleton" style="height:13px;width:60%"></div></td><td><div class="skeleton" style="height:13px;width:60%"></div></td><td><div class="skeleton" style="height:22px;width:60px;border-radius:20px"></div></td><td><div class="skeleton" style="height:28px;width:36px;border-radius:8px"></div></td></tr>
+        <tr class="skeleton-row"><td><div class="skeleton" style="height:13px;width:30px"></div></td><td><div class="skeleton" style="height:13px"></div></td><td><div class="skeleton" style="height:13px;width:80%"></div></td><td><div class="skeleton" style="height:13px;width:60%"></div></td><td><div class="skeleton" style="height:13px;width:60%"></div></td><td><div class="skeleton" style="height:22px;width:60px;border-radius:20px"></div></td><td><div class="skeleton" style="height:28px;width:36px;border-radius:8px"></div></td></tr>
+        <tr class="skeleton-row"><td><div class="skeleton" style="height:13px;width:30px"></div></td><td><div class="skeleton" style="height:13px"></div></td><td><div class="skeleton" style="height:13px;width:80%"></div></td><td><div class="skeleton" style="height:13px;width:60%"></div></td><td><div class="skeleton" style="height:13px;width:60%"></div></td><td><div class="skeleton" style="height:22px;width:60px;border-radius:20px"></div></td><td><div class="skeleton" style="height:28px;width:36px;border-radius:8px"></div></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div id="invPagination" style="display:flex;align-items:center;justify-content:space-between;padding:14px 0 0;font-size:.82rem;color:var(--muted)"></div>
+</div>
+
+<!-- VIEW INVENTORY MODAL -->
+<div class="modal-overlay" id="viewInvModal">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-header">
+      <div class="modal-title"><i class="fas fa-eye" style="color:var(--accent)"></i>Inventory Record</div>
+      <span class="modal-close" onclick="closeModal('viewInvModal')"><i class="fas fa-times"></i></span>
+    </div>
+    <div class="modal-body" id="viewInvBody"></div>
+    <div class="modal-footer"><button class="btn btn-ghost" onclick="closeModal('viewInvModal')">Close</button></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let invPage = 1;
+let invRecords = [];
+let invSearchTimer = null;
+function debounceLoad(){ clearTimeout(invSearchTimer); invSearchTimer = setTimeout(()=>loadInventory(1), 350); }
+
+(function(){ loadSiteFilter().then(()=>loadInventory()); })(); // FIX 5: non-blocking
+
+async function loadSiteFilter() {
+  try {
+    const { ok, data } = await apiFetch('/api/sites-list'); if (!ok) return;
+    document.getElementById('invSiteFilter').innerHTML =
+      '<option value="">All Sites</option>' + data.sites.map(s => `<option value="${s.site_id}">${s.site_name}</option>`).join('');
+  } catch(e) {}
+}
+
+async function loadInventory(page = 1) {
+  invPage = page;
+  const site     = document.getElementById('invSiteFilter').value;
+  const stockout = document.getElementById('invStockoutFilter').value;
+  const q        = document.getElementById('invSearch').value.trim();
+  try {
+    const { ok, data } = await apiFetch(`/admin/inventory/list?page=${page}&site_id=${site}&stockout=${stockout}&q=${encodeURIComponent(q)}`);
+    if (!ok) return;
+    invRecords = data.records || [];
+    document.getElementById('invCount').textContent = data.total || 0;
+    const tbody = document.getElementById('invTbody');
+    if (!invRecords.length) {
+      tbody.innerHTML = '<tr><td colspan="10"><div class="empty-state"><i class="fas fa-warehouse"></i><p>No records found</p></div></td></tr>';
+      return;
+    }
+    tbody.innerHTML = invRecords.map((r, i) => {
+      const si = Number(r.beginning_inventory || 0);  // Starting Inventory = EI_previous
+      const r_rep = Number(r.replenishment || 0);      // R = Replenished Stock
+      const s_sold = Number(r.qty_sold || r.total_sold || 0);        // S = Sold Stock
+      const cs = Number(r.current_stock || 0);         // CS = Current Stock
+      const ei = si + r_rep - s_sold;                  // EI = SI + R - S (Ending Inventory Formula)
+      const eiColor = ei > 0 ? 'var(--accent3)' : ei === 0 ? 'var(--muted)' : 'var(--danger)';
+      const csColor = cs <= 0 ? 'var(--danger)' : cs <= Number(r.reorder_point||0) ? 'var(--warn)' : 'var(--accent)';
+      const eiSafe  = Math.max(0, ei);
+      return `<tr>
+      <td style="color:var(--muted)">${(page - 1) * 20 + i + 1}</td>
+      <td style="font-weight:500">${r.product_name || '—'}</td>
+      <td><span class="badge badge-blue" style="font-size:.7rem">${r.site_name || '—'}</span></td>
+      <td style="text-align:center;color:var(--muted)">${si.toLocaleString()}</td>
+      <td style="text-align:center;color:#3b82f6;font-weight:600">${r_rep.toLocaleString()}</td>
+      <td style="text-align:center;font-weight:700;color:${eiColor}">${eiSafe.toLocaleString()}</td>
+      <td style="text-align:center;font-weight:700;color:${csColor}">${cs.toLocaleString()}</td>
+      <td><span class="badge ${r.stockout_flag === 'Yes' ? 'badge-red' : cs <= Number(r.reorder_point||0) && cs > 0 ? 'badge-warn' : 'badge-green'}">${r.stockout_flag === 'Yes' ? 'Stockout' : cs <= Number(r.reorder_point||0) && cs > 0 ? 'Low Stock' : 'In Stock'}</span></td>
+      <td>
+        <button class="btn btn-ghost btn-sm btn-icon" onclick="viewInvRecord(${i})" title="View">
+          <i class="fas fa-eye" style="color:var(--accent)"></i>
+        </button>
+      </td>
+    </tr>`;}).join('');
+    renderPag('invPagination', page, data.total, 20, 'loadInventory');
+  } catch(e) { showToast('Error loading inventory', 'error'); }
+}
+
+function viewInvRecord(idx) {
+  const r = invRecords[idx]; if (!r) return;
+  const si = Number(r.beginning_inventory || 0);
+  const r_rep = Number(r.replenishment || 0);
+  const s_sold = Number(r.qty_sold || r.total_sold || 0);
+  const cs = Number(r.current_stock || 0);
+  const rs = Number(r.required_stock || 0);
+  const ei = si + r_rep - s_sold;
+  const stockOk = ei > 0;
+  document.getElementById('viewInvBody').innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <!-- Hero -->
+      <div style="background:linear-gradient(135deg,${stockOk?'#14532d,#166534':'#7f1d1d,#991b1b'}) 100%;border-radius:14px;padding:18px 20px;display:flex;align-items:center;gap:14px">
+        <div style="width:48px;height:48px;border-radius:13px;background:rgba(255,255,255,.18);display:flex;align-items:center;justify-content:center;font-size:1.3rem;color:#fff;flex-shrink:0;backdrop-filter:blur(4px)">
+          <i class="fas fa-boxes-stacked"></i>
+        </div>
+        <div style="flex:1;min-width:0">
+          <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:.98rem;font-weight:800;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.product_name||'—'}</div>
+          <div style="color:rgba(255,255,255,.65);font-size:.76rem;margin-top:2px">${r.site_name||'—'}</div>
+        </div>
+        <div style="text-align:right;flex-shrink:0">
+          <div style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;color:#fff;font-size:1.3rem">${ei.toLocaleString()}</div>
+          <div style="color:rgba(255,255,255,.6);font-size:.68rem">Ending Inventory</div>
+        </div>
+      </div>
+      <!-- Inventory Formula Section -->
+      <div style="background:var(--surface2);border-radius:10px;padding:14px;border:1px solid var(--border)">
+        <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;color:var(--muted2);letter-spacing:.06em;margin-bottom:10px">Combined Inventory Formula</div>
+        <div style="font-family:'Courier New',monospace;font-size:.85rem;line-height:1.6;color:var(--text)">
+          <div>EI = SI + R − S</div>
+          <div style="color:var(--accent);font-weight:600;margin-top:8px">${ei.toLocaleString()} = ${si.toLocaleString()} + ${r_rep.toLocaleString()} − ${s_sold.toLocaleString()}</div>
+        </div>
+      </div>
+      <!-- Inventory Levels -->
+      <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;color:var(--muted2);letter-spacing:.06em;padding:2px 0 6px">Inventory Levels</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="view-field">
+          <div class="view-label">SI (Starting Inventory)</div>
+          <div class="view-value" style="color:var(--blue)">${si.toLocaleString()}</div>
+          <div style="font-size:.68rem;color:var(--muted2);margin-top:4px">EI from previous period</div>
+        </div>
+        <div class="view-field">
+          <div class="view-label">EI (Ending Inventory)</div>
+          <div class="view-value" style="color:${stockOk?'var(--accent3)':'var(--danger)'}">${ei.toLocaleString()}</div>
+          <div style="font-size:.68rem;color:var(--muted2);margin-top:4px">Calculated (SI + R − S)</div>
+        </div>
+        <div class="view-field">
+          <div class="view-label">R (Replenished)</div>
+          <div class="view-value" style="color:var(--blue)">${r_rep.toLocaleString()}</div>
+          <div style="font-size:.68rem;color:var(--muted2);margin-top:4px">Stock added</div>
+        </div>
+        <div class="view-field">
+          <div class="view-label">S (Sold)</div>
+          <div class="view-value" style="color:var(--orange)">${s_sold.toLocaleString()}</div>
+          <div style="font-size:.68rem;color:var(--muted2);margin-top:4px">Stock removed</div>
+        </div>
+        <div class="view-field">
+          <div class="view-label">CS (Current Stock)</div>
+          <div class="view-value" style="color:var(--accent)">${cs.toLocaleString()}</div>
+          <div style="font-size:.68rem;color:var(--muted2);margin-top:4px">On hand now</div>
+        </div>
+        <div class="view-field">
+          <div class="view-label">RS (Required Stock)</div>
+          <div class="view-value" style="color:var(--warn)">${rs.toLocaleString()}</div>
+          <div style="font-size:.68rem;color:var(--muted2);margin-top:4px">Min needed</div>
+        </div>
+      </div>   
+    </div>`;
+  openModal('viewInvModal');
+}
+
+function renderPag(elId, page, total, pp, fn) {
+  const pages=Math.ceil(total/pp); const el=document.getElementById(elId);
+  if(!el) return;
+  if(pages<=1){el.innerHTML=`<span style="font-size:.78rem;color:var(--muted)">${total} record${total!==1?'s':''}</span>`;return;}
+  const delta=2; let range=[],left=page-delta,right=page+delta+1,prev=null;
+  for(let i=1;i<=pages;i++){if(i===1||i===pages||(i>=left&&i<right))range.push(i);}
+  let btns='';
+  range.forEach(i=>{
+    if(prev&&i-prev>1)btns+=`<span class="page-btn disabled" style="border:none;background:none;color:var(--muted)">…</span>`;
+    btns+=`<a class="page-btn${i===page?' active':''}" onclick="${fn}(${i})">${i}</a>`;
+    prev=i;
+  });
+  const start=(page-1)*pp+1, end=Math.min(page*pp,total);
+  el.innerHTML=`
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:10px 0 2px">
+      <span style="font-size:.78rem;color:var(--muted)">Showing <strong style="color:var(--text)">${start}–${end}</strong> of <strong style="color:var(--text)">${total}</strong></span>
+      <div style="display:flex;align-items:center;gap:4px">
+        <button class="page-btn${page===1?' disabled':''}" onclick="${fn}(${page-1})" ${page===1?'disabled':''} title="Prev"><i class="fas fa-chevron-left" style="font-size:.6rem"></i></button>
+        ${btns}
+        <button class="page-btn${page===pages?' disabled':''}" onclick="${fn}(${page+1})" ${page===pages?'disabled':''} title="Next"><i class="fas fa-chevron-right" style="font-size:.6rem"></i></button>
+      </div>
+    </div>`;
+}
+
+function openModal(id)  { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+</script>
+{% endblock %}

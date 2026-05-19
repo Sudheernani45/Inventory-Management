@@ -1,0 +1,415 @@
+{% extends "analyst/base.html" %}
+{% block title %}Logistics Tracking{% endblock %}
+{% block page_title %}<i class="fas fa-truck-fast" style="color:var(--accent);margin-right:8px"></i>Logistics Tracking{% endblock %}
+
+{% block content %}
+<style>
+/* ── Pipeline tracker ── */
+.pipeline-track{display:flex;align-items:center;gap:0;margin:16px 0 8px;overflow-x:auto;padding-bottom:4px;}
+.pipe-step{display:flex;flex-direction:column;align-items:center;gap:6px;flex:1;position:relative;min-width:64px;}
+.pipe-dot{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.73rem;border:2.5px solid transparent;transition:all .2s;}
+.pipe-dot.done{background:var(--accent);color:#fff;border-color:var(--accent);}
+.pipe-dot.active{background:#fff;color:var(--accent);border-color:var(--accent);box-shadow:0 0 0 4px rgba(14,107,63,.15);}
+.pipe-dot.idle{background:var(--surface3);color:var(--muted2);border-color:var(--border);}
+.pipe-label{font-size:.58rem;font-weight:600;color:var(--muted);text-align:center;white-space:nowrap;}
+.pipe-label.active-lbl{color:var(--accent);font-weight:700;}
+.pipe-line{flex:1;height:2px;background:var(--border);margin-bottom:20px;min-width:16px;transition:background .2s;}
+.pipe-line.done{background:var(--accent);}
+/* ── Stat pills ── */
+.stat-pill-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px;}
+.stat-pill{display:inline-flex;align-items:center;gap:7px;padding:7px 14px;border-radius:20px;font-size:.77rem;font-weight:600;cursor:pointer;border:2px solid transparent;transition:all .18s;user-select:none;}
+.stat-pill:hover,.stat-pill.active-pill{box-shadow:0 0 0 2px currentColor;}
+/* ── Transport chips ── */
+.transport-chip{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:16px;font-size:.7rem;font-weight:700;white-space:nowrap;}
+.t-Air{background:rgba(59,130,246,.12);color:#3b82f6;} .t-Road,.t-Truck{background:rgba(245,158,11,.12);color:#f59e0b;}
+.t-Rail,.t-Train{background:rgba(168,85,247,.12);color:#a855f7;} .t-Ship,.t-Sea{background:rgba(6,182,212,.12);color:#06b6d4;}
+/* ── RO banner ── */
+.ro-banner{background:linear-gradient(135deg,rgba(99,102,241,.08),rgba(59,130,246,.06));border:1px solid rgba(99,102,241,.2);border-radius:12px;padding:12px 18px;margin-bottom:18px;display:flex;align-items:center;gap:12px;font-size:.79rem;color:var(--text);}
+</style>
+
+<!-- Read-only notice -->
+<div class="ro-banner">
+  <i class="fas fa-eye" style="color:#6366f1;font-size:1rem;flex-shrink:0"></i>
+  <div><strong>Analyst View — Read Only.</strong> You can view and track all shipments. Status updates are restricted to Managers and Admins.</div>
+</div>
+
+<!-- Stat Pills -->
+<div class="stat-pill-row">
+  <div class="stat-pill" style="background:rgba(59,130,246,.1);color:#3b82f6;border-color:rgba(59,130,246,.25)" onclick="filterByStatus('Dispatched')">
+    <i class="fas fa-box-open"></i> Dispatched: <strong id="cntDispatched">—</strong>
+  </div>
+  <div class="stat-pill" style="background:rgba(245,158,11,.1);color:#f59e0b;border-color:rgba(245,158,11,.25)" onclick="filterByStatus('In Transit')">
+    <i class="fas fa-truck-moving"></i> In Transit: <strong id="cntTransit">—</strong>
+  </div>
+  <div class="stat-pill" style="background:rgba(34,197,94,.1);color:#22c55e;border-color:rgba(34,197,94,.25)" onclick="filterByStatus('Delivered')">
+    <i class="fas fa-circle-check"></i> Delivered: <strong id="cntDelivered">—</strong>
+  </div>
+  <div class="stat-pill" style="background:rgba(239,68,68,.1);color:#ef4444;border-color:rgba(239,68,68,.25)" onclick="filterByStatus('Cancelled')">
+    <i class="fas fa-ban"></i> Cancelled: <strong id="cntCancelled">—</strong>
+  </div>
+  <div class="stat-pill" style="background:var(--surface2);color:var(--muted);border-color:var(--border)" onclick="filterByStatus('')">
+    <i class="fas fa-list"></i> All
+  </div>
+</div>
+
+<!-- Table Card -->
+<div class="card">
+  <div class="card-header" style="flex-wrap:wrap;gap:12px;">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <div class="card-title"><i class="fas fa-route" style="color:var(--accent)"></i>All Shipments</div>
+      <span id="shipCount" class="badge badge-blue">—</span>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <div class="search-box">
+        <i class="fas fa-search"></i>
+        <input type="text" id="shipSearch" class="form-control" placeholder="Search ID, product…" style="width:200px" oninput="debounceShip()"/>
+      </div>
+      <select class="form-control" id="shipStatusFilter" style="width:145px" onchange="loadShipments()">
+        <option value="">All Statuses</option>
+        <option>Dispatched</option><option>Picked Up</option><option>In Transit</option>
+        <option>Out for Delivery</option><option>Delivered</option><option>Delayed</option><option>Cancelled</option>
+      </select>
+      <select class="form-control" id="shipTypeFilter" style="width:120px" onchange="loadShipments()">
+        <option value="">All Transport</option>
+        <option>Truck</option><option>Rail</option><option>Air</option><option>Sea</option>
+      </select>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:42px">#</th>
+          <th>Shipment ID</th>
+          <th>Site</th>
+          <th>Product</th>
+          <th>Ship Date</th>
+          <th>Est. Delivery</th>
+          <th style="text-align:center">Qty</th>
+          <th>Status</th>
+          <th>Transport</th>
+          <th style="width:80px">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="shipTbody">
+        {% for i in range(5) %}<tr><td colspan="10"><div class="skeleton" style="height:13px"></div></td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div id="shipPagination" style="padding:12px 0 0"></div>
+</div>
+
+<!-- View Modal -->
+<div id="viewShipModal" class="modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:1500;align-items:center;justify-content:center;backdrop-filter:blur(4px)">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-header">
+      <div class="modal-title"><i class="fas fa-ship" style="color:var(--accent)"></i>Shipment Details</div>
+      <button class="modal-close" onclick="document.getElementById('viewShipModal').style.display='none'"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="modal-body" id="viewShipBody"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="document.getElementById('viewShipModal').style.display='none'">Close</button>
+      <button class="btn btn-primary" id="viewTrackBtn" onclick="openTrackFromView()"><i class="fas fa-location-dot"></i> Track Live</button>
+    </div>
+  </div>
+</div>
+
+<!-- GPS Tracking Modal (same as admin — view only) -->
+<div id="trackingOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:2000;align-items:center;justify-content:center;backdrop-filter:blur(6px)">
+  <div style="background:var(--surface);border-radius:22px;width:100%;max-width:920px;margin:16px;box-shadow:0 40px 120px rgba(0,0,0,.38);overflow:hidden;max-height:96vh;display:flex;flex-direction:column;">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 24px;border-bottom:1px solid var(--border);flex-shrink:0;">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div id="trackTypeIcon" style="width:42px;height:42px;border-radius:12px;background:var(--accent-dim);display:flex;align-items:center;justify-content:center;font-size:1.3rem;">🚛</div>
+        <div>
+          <div style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:.98rem;color:var(--text)" id="trackTitle">Tracking</div>
+          <div style="font-size:.71rem;color:var(--muted)" id="trackSubtitle">Route Map</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span id="trackStatusBadge" class="badge badge-blue">—</span>
+        <span class="badge" style="background:rgba(99,102,241,.1);color:#6366f1;border:1px solid rgba(99,102,241,.2);font-size:.67rem"><i class="fas fa-eye" style="margin-right:4px"></i>View Only</span>
+        <button onclick="closeTracking()" style="background:var(--surface2);border:1px solid var(--border);border-radius:50%;width:34px;height:34px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--muted)"><i class="fas fa-times"></i></button>
+      </div>
+    </div>
+    <div style="display:flex;flex:1;overflow:hidden;min-height:0;">
+      <div style="width:260px;flex-shrink:0;overflow-y:auto;border-right:1px solid var(--border);padding:16px;display:flex;flex-direction:column;gap:10px;">
+        <div style="background:var(--surface2);border-radius:10px;padding:10px 13px;border:1px solid var(--border);">
+          <div style="font-size:.63rem;color:var(--muted2);text-transform:uppercase;letter-spacing:.08em;margin-bottom:2px;">Shipment ID</div>
+          <div id="trackShipId" style="font-family:monospace;font-weight:700;font-size:.88rem;color:var(--accent)">—</div>
+        </div>
+        <div style="background:var(--surface2);border-radius:10px;padding:10px 13px;border:1px solid var(--border);">
+          <div style="font-size:.63rem;color:var(--muted2);text-transform:uppercase;letter-spacing:.08em;margin-bottom:2px;">Product</div>
+          <div id="trackProduct" style="font-weight:600;font-size:.84rem">—</div>
+          <div id="trackQty" style="font-size:.74rem;color:var(--muted);margin-top:2px">Qty: —</div>
+        </div>
+        <div style="background:var(--surface2);border-radius:10px;padding:10px 13px;border:1px solid var(--border);">
+          <div style="font-size:.63rem;color:var(--muted2);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;">Route</div>
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            <div style="display:flex;align-items:center;gap:8px;"><div style="width:8px;height:8px;border-radius:50%;background:var(--accent);flex-shrink:0;"></div><span id="trackOrigin" style="font-size:.79rem">—</span></div>
+            <div style="margin-left:3px;width:2px;height:12px;background:var(--border)"></div>
+            <div style="display:flex;align-items:center;gap:8px;"><div style="width:8px;height:8px;border-radius:50%;background:#ef4444;flex-shrink:0;"></div><span id="trackDest" style="font-size:.79rem">—</span></div>
+          </div>
+        </div>
+        <div style="background:var(--surface2);border-radius:10px;padding:10px 13px;border:1px solid var(--border);">
+          <div style="font-size:.63rem;color:var(--muted2);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px;">Transport</div>
+          <div style="display:flex;align-items:center;gap:8px;"><span id="trackTypeEmoji" style="font-size:1.1rem">🚛</span><span id="trackTypeName" style="font-weight:600;font-size:.84rem">—</span></div>
+        </div>
+        <div style="background:var(--surface2);border-radius:10px;padding:10px 13px;border:1px solid var(--border);">
+          <div style="font-size:.63rem;color:var(--muted2);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;">Timeline</div>
+          <div id="trackTimeline"></div>
+        </div>
+        <a id="trackGmapsBtn" href="#" target="_blank" style="display:flex;align-items:center;justify-content:center;gap:8px;padding:10px;border-radius:10px;background:linear-gradient(135deg,#4285F4,#34A853);color:#fff;text-decoration:none;font-weight:700;font-size:.78rem;">
+          <i class="fab fa-google"></i> Open in Google Maps
+        </a>
+      </div>
+      <div style="flex:1;position:relative;min-height:420px;">
+        <div id="trackMapDiv" style="position:absolute;inset:0;width:100%;height:100%;"></div>
+        <div style="position:absolute;bottom:12px;right:12px;background:var(--surface);border-radius:11px;padding:11px 14px;box-shadow:0 4px 20px rgba(0,0,0,.15);z-index:10;">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;"><div style="width:7px;height:7px;border-radius:50%;background:#22c55e;animation:pulse 2s infinite"></div><div style="font-size:.64rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em">Live</div></div>
+          <div id="trackMapShipId" style="font-family:monospace;color:var(--accent);font-weight:700;font-size:.84rem">—</div>
+          <div id="trackMapType" style="font-size:.7rem;color:var(--muted);margin-top:1px">—</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(1.5)}}</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const TICONS={Air:'✈️',Road:'🚛',Truck:'🚛',Rail:'🚂',Train:'🚂',Sea:'🚢',Ship:'🚢'};
+const CITY_COORDS={
+  'Hyderabad':{lat:17.385,lng:78.486},'Bangalore':{lat:12.971,lng:77.594},
+  'Chennai':{lat:13.082,lng:80.270},'Mumbai':{lat:19.075,lng:72.877},
+  'Delhi':{lat:28.704,lng:77.102},'Kolkata':{lat:22.572,lng:88.363},
+  'Kurnool':{lat:15.828,lng:78.037},'Pune':{lat:18.516,lng:73.856},
+  'Ahmedabad':{lat:23.022,lng:72.571},'Jaipur':{lat:26.912,lng:75.787},
+  'Lucknow':{lat:26.846,lng:80.946},'Visakhapatnam':{lat:17.686,lng:83.218}
+};
+const PIPELINE_STEPS=[
+  {key:'Dispatched',icon:'fa-box',label:'Dispatched'},
+  {key:'Picked Up',icon:'fa-dolly',label:'Picked Up'},
+  {key:'In Transit',icon:'fa-truck-fast',label:'In Transit'},
+  {key:'Out for Delivery',icon:'fa-house',label:'Out for Delivery'},
+  {key:'Delivered',icon:'fa-circle-check',label:'Delivered'},
+];
+
+let shipRecords=[], shipTimer=null, currentPage=1;
+let _viewIdx=-1, _leafletMap=null, _leafletLayers=[];
+
+function debounceShip(){clearTimeout(shipTimer);shipTimer=setTimeout(()=>loadShipments(1),320);}
+
+function statusBadgeClass(s){
+  const m={Delivered:'badge-green','In Transit':'badge-blue',Dispatched:'badge-blue','Out for Delivery':'badge-yellow','Picked Up':'badge-blue',Delayed:'badge-red',Cancelled:'badge-gray',Pending:'badge-yellow'};
+  return m[s]||'badge-gray';
+}
+
+function filterByStatus(s){
+  document.getElementById('shipStatusFilter').value=s;
+  loadShipments(1);
+}
+
+async function loadShipStats(){
+  const{ok,data}=await apiFetch('/analyst/api/shipments/stats');
+  if(!ok)return;
+  document.getElementById('cntDispatched').textContent=((data.dispatched||0)+(data.picked_up||0)+(data.out_for_delivery||0)).toLocaleString();
+  document.getElementById('cntTransit').textContent=(data.in_transit||0).toLocaleString();
+  document.getElementById('cntDelivered').textContent=(data.delivered||0).toLocaleString();
+  document.getElementById('cntCancelled').textContent=(data.cancelled||0).toLocaleString();
+}
+
+async function loadShipments(page=1){
+  currentPage=page;
+  const status=document.getElementById('shipStatusFilter').value;
+  const q=document.getElementById('shipSearch').value.trim();
+  const ttype=document.getElementById('shipTypeFilter').value;
+  const tbody=document.getElementById('shipTbody');
+  tbody.innerHTML=Array(5).fill(`<tr>${Array(10).fill('<td><div class="skeleton" style="height:12px;width:85%"></div></td>').join('')}</tr>`).join('');
+  try{
+    const{ok,data}=await apiFetch(`/analyst/api/shipments/list?page=${page}&status=${encodeURIComponent(status)}&q=${encodeURIComponent(q)}&ttype=${encodeURIComponent(ttype)}&per_page=25`);
+    if(!ok)return;
+    shipRecords=data.records||[];
+    document.getElementById('shipCount').textContent=(data.total||0).toLocaleString();
+    renderTable(shipRecords,page,25);
+    renderPag('shipPagination',page,data.total||0,25,'loadShipments');
+    loadShipStats();
+  }catch(e){console.error(e);}
+}
+
+function renderTable(records,page,pp){
+  const tbody=document.getElementById('shipTbody');
+  if(!records.length){tbody.innerHTML='<tr><td colspan="10"><div class="empty-state"><i class="fas fa-truck-fast"></i><p>No shipments found</p></div></td></tr>';return;}
+  tbody.innerHTML=records.map((r,i)=>{
+    const n=(page-1)*pp+i+1;
+    const carrier=r.transportation_type||r.transport||r.carrier||'Truck';
+    const icon=TICONS[carrier]||'📦';
+    const status=r.delivery_status||r.status||'Pending';
+    const tClass=`t-${carrier}`;
+    return `<tr>
+      <td style="color:var(--muted2);font-size:.74rem;font-weight:600">${n}</td>
+      <td><a href="#" onclick="viewShip(${i});return false" style="font-family:monospace;font-size:.77rem;color:var(--accent);font-weight:700;text-decoration:none">${r.shipment_id||'—'}</a></td>
+      <td><span style="background:var(--surface2);padding:2px 8px;border-radius:6px;font-size:.75rem;font-weight:600;color:var(--text)">${r.site_name||r.site||r.site_id||'—'}</span></td>
+      <td style="font-size:.79rem;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500">${r.product_name||r.product||r.product_id||'—'}</td>
+      <td style="font-size:.77rem;color:var(--muted)">${r.shipment_date||r.date||'—'}</td>
+      <td style="font-size:.77rem;color:var(--muted)">${r.delivery_date||'—'}</td>
+      <td style="text-align:center;font-weight:700">${Number(r.quantity||0).toLocaleString()}</td>
+      <td><span class="badge ${statusBadgeClass(status)}">${status}</span></td>
+      <td><span class="transport-chip ${tClass}">${icon} ${carrier}</span></td>
+      <td>
+        <div style="display:flex;gap:5px;justify-content:flex-end;">
+          <button class="btn btn-ghost btn-sm btn-icon" onclick="viewShip(${i})" title="View"><i class="fas fa-eye" style="color:var(--accent)"></i></button>
+          <button class="btn btn-ghost btn-sm btn-icon" onclick="openTracking(${i})" title="Track"><i class="fas fa-location-dot" style="color:#3b82f6"></i></button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+/* View Detail */
+function viewShip(i){
+  _viewIdx=i;
+  const r=shipRecords[i];if(!r)return;
+  const carrier=r.transportation_type||r.transport||r.carrier||'Truck';
+  const icon=TICONS[carrier]||'📦';
+  const status=r.delivery_status||r.status||'Pending';
+  const curOrder=['Dispatched','Picked Up','In Transit','Out for Delivery','Delivered'];
+  const curIdx=curOrder.indexOf(status);
+  const pipeHtml=PIPELINE_STEPS.map((s,i)=>{
+    const isDone=curIdx>=i,isCur=s.key===status;
+    const cls=isCur?'active':(isDone?'done':'idle');
+    return `<div class="pipe-step"><div class="pipe-dot ${cls}"><i class="fas ${s.icon}"></i></div><div class="pipe-label${isCur?' active-lbl':''}">${s.label}</div></div>${i<PIPELINE_STEPS.length-1?`<div class="pipe-line${isDone?' done':''}"></div>`:''}`;
+  }).join('');
+  document.getElementById('viewShipBody').innerHTML=`
+    <div style="display:flex;flex-direction:column;gap:14px;">
+      <div style="background:linear-gradient(135deg,#1b3a6b,#1a5ea8);border-radius:14px;padding:16px 18px;color:#fff;">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div style="width:44px;height:44px;border-radius:12px;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-size:1.4rem;">${icon}</div>
+          <div style="flex:1;"><div style="font-size:.63rem;opacity:.7;text-transform:uppercase;letter-spacing:.09em">Shipment ID</div><div style="font-family:monospace;font-size:.95rem;font-weight:800;">${r.shipment_id||'—'}</div></div>
+          <span class="badge" style="background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.3);">${status}</span>
+        </div>
+        <div style="margin-top:11px;padding-top:11px;border-top:1px solid rgba(255,255,255,.15);display:flex;justify-content:space-between;">
+          <span style="opacity:.7;font-size:.77rem;">${carrier} transport</span>
+          <span style="opacity:.7;font-size:.77rem;">${r.shipment_date||r.date||'—'}</span>
+        </div>
+      </div>
+      <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;color:var(--muted2);letter-spacing:.06em;">Shipment Progress</div>
+      <div class="pipeline-track" id="viewPipeline">${pipeHtml}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div class="view-field" style="grid-column:1/-1;"><div class="view-label">Product</div><div class="view-value">${r.product_name||r.product||r.product_id||'—'}</div></div>
+        <div class="view-field"><div class="view-label">Site / Warehouse</div><div class="view-value">${r.site_name||r.site||r.site_id||'—'}</div></div>
+        <div class="view-field"><div class="view-label">Quantity</div><div class="view-value highlight">${Number(r.quantity||0).toLocaleString()} units</div></div>
+        <div class="view-field"><div class="view-label">Ship Date</div><div class="view-value">${r.shipment_date||r.date||'—'}</div></div>
+        <div class="view-field"><div class="view-label">Est. Delivery</div><div class="view-value">${r.delivery_date||'Pending'}</div></div>
+        <div class="view-field" style="grid-column:1/-1;"><div class="view-label">Transport Mode</div><div class="view-value">${icon} ${carrier}</div></div>
+      </div>
+    </div>`;
+  document.getElementById('viewShipModal').style.display='flex';
+}
+
+function openTrackFromView(){
+  document.getElementById('viewShipModal').style.display='none';
+  if(_viewIdx>=0)openTracking(_viewIdx);
+}
+
+/* GPS Tracking */
+function extractCity(s){for(const c of Object.keys(CITY_COORDS))if((s||'').toLowerCase().includes(c.toLowerCase()))return c;return null;}
+function guessOrigin(s){const dest=extractCity(s)||'Hyderabad';const others=Object.keys(CITY_COORDS).filter(c=>c!==dest);return others[Math.floor(Math.random()*others.length)]||'Mumbai';}
+
+function openTracking(i){
+  const r=shipRecords[i];if(!r)return;
+  const carrier=r.transportation_type||r.transport||r.carrier||'Truck';
+  const icon=TICONS[carrier]||'📦';
+  const shipId=r.shipment_id||('SHP-'+i);
+  const status=r.delivery_status||r.status||'Pending';
+  const siteName=r.site_name||r.site||'';
+  const originCity=guessOrigin(siteName),destCity=extractCity(siteName)||'Hyderabad';
+  const oCoord=CITY_COORDS[originCity]||CITY_COORDS['Mumbai'];
+  const dCoord=CITY_COORDS[destCity]||CITY_COORDS['Hyderabad'];
+  document.getElementById('trackTitle').textContent=`Tracking: ${shipId}`;
+  document.getElementById('trackSubtitle').textContent=`${icon} ${carrier} · ${r.product_name||r.product||r.product_id||'—'}`;
+  document.getElementById('trackTypeIcon').textContent=icon;
+  document.getElementById('trackShipId').textContent=shipId;
+  document.getElementById('trackMapShipId').textContent=shipId;
+  document.getElementById('trackMapType').textContent=`Via ${carrier}`;
+  document.getElementById('trackProduct').textContent=r.product_name||r.product||r.product_id||'—';
+  document.getElementById('trackQty').textContent=`Qty: ${r.quantity||0} units`;
+  document.getElementById('trackTypeName').textContent=carrier;
+  document.getElementById('trackTypeEmoji').textContent=icon;
+  document.getElementById('trackOrigin').textContent=`Origin: ${originCity}`;
+  document.getElementById('trackDest').textContent=`Dest: ${destCity}`;
+  document.getElementById('trackStatusBadge').className=`badge ${statusBadgeClass(status)}`;
+  document.getElementById('trackStatusBadge').textContent=status;
+  document.getElementById('trackTimeline').innerHTML=buildTimeline(carrier,r.shipment_date||r.date,status);
+  document.getElementById('trackGmapsBtn').href=`https://www.google.com/maps/dir/${encodeURIComponent(originCity+',India')}/${encodeURIComponent(destCity+',India')}`;
+  document.getElementById('trackingOverlay').style.display='flex';
+  setTimeout(()=>initMap(oCoord,dCoord,originCity,destCity,carrier),140);
+}
+
+function initMap(oC,dC,oCity,dCity,carrier){
+  if(!_leafletMap){
+    _leafletMap=L.map('trackMapDiv',{zoomControl:true,attributionControl:true});
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap',maxZoom:18}).addTo(_leafletMap);
+  }
+  _leafletLayers.forEach(l=>_leafletMap.removeLayer(l));_leafletLayers=[];
+  const gDot=L.divIcon({className:'',html:'<div style="width:13px;height:13px;background:#22c55e;border:2.5px solid #fff;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,.3)"></div>',iconSize:[13,13],iconAnchor:[6,6]});
+  const rDot=L.divIcon({className:'',html:'<div style="width:13px;height:13px;background:#ef4444;border:2.5px solid #fff;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,.3)"></div>',iconSize:[13,13],iconAnchor:[6,6]});
+  const icon=TICONS[carrier]||'📦';
+  const midLat=oC.lat*.45+dC.lat*.55,midLng=oC.lng*.45+dC.lng*.55;
+  const tIcon=L.divIcon({className:'',html:`<div style="background:var(--accent);color:#fff;padding:4px 9px;border-radius:8px;font-size:.67rem;font-weight:700;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.2)">${icon} In Route</div>`,iconSize:[90,26],iconAnchor:[45,13]});
+  const m1=L.marker([oC.lat,oC.lng],{icon:gDot}).bindPopup(`<b>Origin</b><br>${oCity}`).addTo(_leafletMap);
+  const m2=L.marker([dC.lat,dC.lng],{icon:rDot}).bindPopup(`<b>Destination</b><br>${dCity}`).addTo(_leafletMap);
+  const m3=L.marker([midLat,midLng],{icon:tIcon}).addTo(_leafletMap);
+  const line=L.polyline([[oC.lat,oC.lng],[midLat,midLng],[dC.lat,dC.lng]],{color:'#0e6b3f',weight:3,dashArray:'8,6',opacity:.88}).addTo(_leafletMap);
+  _leafletLayers=[m1,m2,m3,line];
+  _leafletMap.fitBounds([[oC.lat,oC.lng],[dC.lat,dC.lng]],{padding:[40,40]});
+  _leafletMap.invalidateSize();
+}
+
+function closeTracking(){document.getElementById('trackingOverlay').style.display='none';}
+document.addEventListener('DOMContentLoaded',()=>{
+  const o=document.getElementById('trackingOverlay');
+  if(o)o.addEventListener('click',e=>{if(e.target===o)closeTracking();});
+});
+
+function buildTimeline(carrier,date,status){
+  const steps=[
+    {label:'Order Placed',done:true,icon:'fas fa-file-invoice'},
+    {label:'Dispatched',done:['In Transit','Out for Delivery','Delivered'].includes(status),icon:'fas fa-box-open'},
+    {label:'In Transit',done:['Out for Delivery','Delivered'].includes(status),icon:`fas fa-${carrier==='Air'?'plane':carrier==='Sea'||carrier==='Ship'?'ship':carrier==='Rail'||carrier==='Train'?'train':'truck'}`},
+    {label:'Delivered',done:status==='Delivered',icon:'fas fa-circle-check'},
+  ];
+  return steps.map(s=>`<div style="display:flex;align-items:flex-start;gap:9px;margin-bottom:10px;">
+    <div style="width:24px;height:24px;border-radius:50%;background:${s.done?'var(--accent)':'var(--surface3)'};display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+      <i class="${s.icon}" style="font-size:.58rem;color:${s.done?'#fff':'var(--muted)'}"></i>
+    </div>
+    <div><div style="font-size:.74rem;font-weight:${s.done?'600':'400'};color:${s.done?'var(--text)':'var(--muted)'}">${s.label}</div>${s.done&&date?`<div style="font-size:.64rem;color:var(--muted);margin-top:1px">${date}</div>`:''}</div>
+  </div>`).join('');
+}
+
+function renderPag(elId,page,total,pp,fn){
+  const pages=Math.ceil(total/pp),el=document.getElementById(elId);
+  if(!el)return;
+  if(pages<=1){el.innerHTML=`<span style="font-size:.77rem;color:var(--muted)">${total} shipments total</span>`;return;}
+  const start=(page-1)*pp+1,end=Math.min(page*pp,total);
+  let btns='';
+  for(let i=1;i<=pages;i++){
+    if(i===1||i===pages||(i>=page-2&&i<=page+2))btns+=`<a class="page-btn${i===page?' active':''}" onclick="${fn}(${i})">${i}</a>`;
+    else if(!btns.endsWith('…'))btns+='<span style="color:var(--muted);padding:0 4px">…</span>';
+  }
+  el.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;padding:8px 0 2px;">
+    <span style="font-size:.77rem;color:var(--muted)">Showing <strong>${start}–${end}</strong> of <strong>${total}</strong></span>
+    <div style="display:flex;gap:4px;">
+      <button class="page-btn" onclick="${fn}(${page-1})" ${page===1?'disabled':''}><i class="fas fa-chevron-left" style="font-size:.6rem"></i></button>
+      ${btns}
+      <button class="page-btn" onclick="${fn}(${page+1})" ${page===pages?'disabled':''}><i class="fas fa-chevron-right" style="font-size:.6rem"></i></button>
+    </div>
+  </div>`;
+}
+
+loadShipments(1);
+</script>
+{% endblock %}

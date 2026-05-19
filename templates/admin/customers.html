@@ -1,0 +1,192 @@
+{% extends "admin/base.html" %}
+{% block title %}Customers{% endblock %}
+{% block page_title %}<i class="fas fa-user-group" style="color:var(--blue);margin-right:8px"></i>Customers{% endblock %}
+
+{% block head %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+.cust-stat{background:#fff;border:1px solid var(--border);border-radius:14px;padding:16px 18px;box-shadow:var(--shadow-sm);}
+.cust-stat-val{font-family:'Plus Jakarta Sans',sans-serif;font-size:1.6rem;font-weight:800;color:var(--text);}
+.cust-stat-label{font-size:.72rem;color:var(--muted);margin-top:3px;}
+.cust-stat-icon{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0;}
+.cust-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px;}
+@media(max-width:900px){.cust-grid{grid-template-columns:1fr 1fr;}}
+
+.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;}
+.detail-item{background:var(--surface2);border-radius:9px;padding:10px 13px;}
+.detail-label{font-size:.68rem;color:var(--muted);margin-bottom:2px;}
+.detail-val{font-size:.88rem;font-weight:600;color:var(--text);}
+.badge-clv{background:rgba(14,107,63,.1);color:#0e6b3f;padding:2px 10px;border-radius:20px;font-size:.72rem;font-weight:700;}
+.badge-nps-pos{background:rgba(34,197,94,.12);color:#16a34a;padding:2px 10px;border-radius:20px;font-size:.72rem;font-weight:700;}
+.badge-nps-neg{background:rgba(239,68,68,.12);color:var(--danger);padding:2px 10px;border-radius:20px;font-size:.72rem;font-weight:700;}
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Charts Row -->
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px">
+  <div class="card" style="padding:14px">
+    <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:.85rem;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:6px">
+      <i class="fas fa-venus-mars" style="color:var(--purple)"></i> Gender Distribution
+    </div>
+    <div style="position:relative;height:180px;display:flex;align-items:center;justify-content:center">
+      <canvas id="genderChart"></canvas>
+    </div>
+  </div>
+  <div class="card" style="padding:14px">
+    <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:.85rem;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:6px">
+      <i class="fas fa-money-bill-trend-up" style="color:var(--green-brand)"></i> Income Bracket Distribution
+    </div>
+    <div style="position:relative;height:180px">
+      <canvas id="incomeChart"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- Customer Table -->
+<div class="card">
+  <div class="card-header" style="flex-wrap:wrap;gap:10px">
+    <div style="display:flex;align-items:center;gap:12px">
+      <div class="card-title">Customer Directory</div>
+      <span id="custCount" class="badge badge-blue">—</span>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+      <div style="position:relative">
+        <i class="fas fa-search" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:.8rem"></i>
+        <input type="text" id="custSearch" class="form-control" placeholder="Search by ID…" style="padding-left:32px;width:180px" oninput="debounceCust()"/>
+      </div>
+      <select class="form-control" id="custGenderFilter" style="width:130px" onchange="loadCustomers()">
+        <option value="">All Genders</option>
+        <option>Male</option><option>Female</option><option>Other</option>
+      </select>
+      <select class="form-control" id="custIncomeFilter" style="width:150px" onchange="loadCustomers()">
+        <option value="">All Incomes</option>
+        <option>5 LPA</option><option>10 LPA</option><option>15 LPA</option><option>20+ LPA</option>
+      </select>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr>
+        <th>#</th>
+        <th>Customer ID</th>
+        <th>Age</th>
+        <th>Gender</th>
+        <th>Income Bracket</th>
+        <th>Avg. Spend (₹)</th>
+        <th>Purchase Freq.</th>
+        
+      </tr></thead>
+      <tbody id="custTbody"><tr><td colspan="9" style="text-align:center;padding:32px"><span class="spinner"></span></td></tr></tbody>
+    </table>
+  </div>
+  <div id="custPagination" style="display:flex;align-items:center;justify-content:space-between;padding:14px 0 0;font-size:.82rem;color:var(--muted)"></div>
+</div>
+
+<!-- Customer Detail Modal -->
+<div class="modal-overlay" id="viewCustModal">
+  <div class="modal" style="max-width:540px">
+    <div class="modal-header">
+      <div class="modal-title"><i class="fas fa-user-circle" style="color:var(--blue)"></i> Customer Details</div>
+      <span class="modal-close" onclick="closeModal('viewCustModal')"><i class="fas fa-times"></i></span>
+    </div>
+    <div class="modal-body" id="viewCustBody"></div>
+    <div class="modal-footer"><button class="btn btn-ghost" onclick="closeModal('viewCustModal')">Close</button></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let custPage = 1, custRecords = [], custSearchTimer = null;
+function debounceCust(){ clearTimeout(custSearchTimer); custSearchTimer = setTimeout(()=>loadCustomers(1), 350); }
+
+(async function(){
+  await loadCustomerStats();
+  loadCustomers();
+})();
+
+async function loadCustomerStats(){
+  const {ok,data} = await apiFetch('/admin/customers/stats');
+  
+  // Gender donut
+  if(data.by_gender?.length){
+    const gc = document.getElementById('genderChart').getContext('2d');
+    new Chart(gc,{type:'doughnut',data:{
+      labels: data.by_gender.map(g=>g.label),
+      datasets:[{data:data.by_gender.map(g=>g.count),backgroundColor:['#3b82f6','#ec4899','#8b5cf6'],borderWidth:3,borderColor:'#fff',hoverOffset:8}]
+    },options:{cutout:'68%',responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{font:{size:11},boxWidth:12}}}}});
+  }
+
+  // Income bar
+  if(data.by_income?.length){
+    const ic = document.getElementById('incomeChart').getContext('2d');
+    const sorted = data.by_income.sort((a,b)=>a.label.localeCompare(b.label));
+    new Chart(ic,{type:'bar',data:{
+      labels: sorted.map(g=>g.label),
+      datasets:[{label:'Customers',data:sorted.map(g=>g.count),backgroundColor:'rgba(14,107,63,0.7)',borderColor:'#0e6b3f',borderWidth:2,borderRadius:6}]
+    },options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false}},y:{grid:{color:'rgba(0,0,0,.04)'},ticks:{precision:0}}}}});
+  }
+}
+
+async function loadCustomers(page=1){
+  custPage = page;
+  const q = document.getElementById('custSearch').value.trim();
+  const gender = document.getElementById('custGenderFilter').value;
+  const income = document.getElementById('custIncomeFilter').value;
+  const {ok,data} = await apiFetch(`/admin/customers/list?page=${page}&q=${encodeURIComponent(q)}&gender=${encodeURIComponent(gender)}&income=${encodeURIComponent(income)}`);
+  if(!ok) return;
+  custRecords = data.customers || [];
+  document.getElementById('custCount').textContent = data.total || 0;
+  const tbody = document.getElementById('custTbody');
+  if(!custRecords.length){
+    tbody.innerHTML = '<tr><td colspan="9"><div class="empty-state"><i class="fas fa-users"></i><p>No customers found</p></div></td></tr>';
+    return;
+  }
+  const npsClass = n => n >= 9 ? 'badge-green' : n >= 7 ? 'badge-yellow' : 'badge-red';
+  tbody.innerHTML = custRecords.map((c,i)=>`<tr>
+    <td style="color:var(--muted)">${(page-1)*20+i+1}</td>
+    <td style="font-weight:600;font-family:monospace;font-size:.82rem">${c.customer_id}</td>
+    <td>${c.age||'—'}</td>
+    <td><span class="badge ${c.gender==='Female'?'badge-purple':c.gender==='Male'?'badge-blue':'badge-gray'}">${c.gender||'—'}</span></td>
+    <td style="color:var(--muted)">${c.income_bracket||'—'}</td>
+    <td style="font-weight:700;color:#0e6b3f">₹${Number(c.average_spend||0).toLocaleString('en-IN',{maximumFractionDigits:0})}</td>
+    <td style="text-align:center">${c.purchase_frequency||'—'}</td>
+  </tr>`).join('');
+  renderPag('custPagination', page, data.total, 20, 'loadCustomers');
+}
+
+function viewCustomer(idx){
+  const c = custRecords[idx]; if(!c) return;
+  const npsLabel = c.nps >= 9 ? '🟢 Promoter' : c.nps >= 7 ? '🟡 Passive' : c.nps != null ? '🔴 Detractor' : '—';
+  const pref = c.preferred_categories || 'N/A';
+  document.getElementById('viewCustBody').innerHTML = `
+    <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px;padding:14px;background:var(--surface2);border-radius:12px">
+      <div style="width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,var(--blue),var(--purple));display:flex;align-items:center;justify-content:center;color:#fff;font-size:1.3rem;font-weight:800;flex-shrink:0">
+        ${(c.customer_id||'C').slice(-2)}
+      </div>
+      <div>
+        <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:1rem;font-weight:800">${c.customer_id}</div>
+        <div style="font-size:.78rem;color:var(--muted);margin-top:2px">${c.gender||''} · ${c.age ? c.age+' yrs' : ''} · ${c.income_bracket||''}</div>
+        <div style="margin-top:6px;display:flex;gap:6px">
+          <span class="badge badge-blue">${c.gender||'—'}</span>
+          <span style="font-size:.72rem;background:rgba(14,107,63,.1);color:#0e6b3f;padding:2px 10px;border-radius:20px;font-weight:700">CLV ₹${Number(c.clv||0).toLocaleString('en-IN',{maximumFractionDigits:0})}</span>
+        </div>
+      </div>
+    </div>
+    <div class="detail-grid">
+      <div class="detail-item"><div class="detail-label">Total Spend</div><div class="detail-val">₹${Number(c.total_spend||0).toLocaleString('en-IN',{maximumFractionDigits:0})}</div></div>
+      <div class="detail-item"><div class="detail-label">Avg. Spend / Visit</div><div class="detail-val">₹${Number(c.average_spend||0).toLocaleString('en-IN',{maximumFractionDigits:0})}</div></div>
+      <div class="detail-item"><div class="detail-label">Purchase Frequency</div><div class="detail-val">${c.purchase_frequency||'—'} visits</div></div>
+      <div class="detail-item"><div class="detail-label">Last Purchase</div><div class="detail-val">${c.last_purchase_date||'—'}</div></div>
+      <div class="detail-item"><div class="detail-label">CSAT Score</div><div class="detail-val">${c.csat!=null?c.csat.toFixed(1)+' / 5':'—'}</div></div>
+      <div class="detail-item"><div class="detail-label">NPS Score</div><div class="detail-val">${npsLabel} (${c.nps!=null?c.nps:'—'})</div></div>
+      <div class="detail-item" style="grid-column:1/-1"><div class="detail-label">Preferred Categories</div><div class="detail-val" style="font-size:.82rem">${pref}</div></div>
+      <div class="detail-item"><div class="detail-label">Customer Lifetime Value</div><div class="detail-val">₹${Number(c.clv||0).toLocaleString('en-IN',{maximumFractionDigits:0})}</div></div>
+      <div class="detail-item"><div class="detail-label">Income Bracket</div><div class="detail-val">${c.income_bracket||'—'}</div></div>
+    </div>`;
+  openModal('viewCustModal');
+}
+</script>
+{% endblock %}

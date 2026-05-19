@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>{% block title %}INVENTORY{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/theme.css') }}"/>
+  {% block extra_css %}{% endblock %}
+</head>
+<body>
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <a href="{{ url_for('common.home') }}" class="brand">
+        <div class="logo-mark">📦</div>
+        <div class="brand-text">
+          <span class="brand-name">INVENTORY</span>
+          <span class="brand-tagline">Management Suite</span>
+        </div>
+      </a>
+    </div>
+
+    <nav class="sidebar-nav">
+      {% set role = session.get('role') %}
+
+      <div class="nav-section-label">Overview</div>
+      {% if role == 'admin' %}
+      <a href="{{ url_for('admin.dashboard') }}" class="nav-link {% if request.endpoint == 'admin.dashboard' %}active{% endif %}">
+        <span class="nav-icon">⊞</span> Dashboard
+      </a>
+      {% elif role == 'manager' %}
+      <a href="{{ url_for('manager.dashboard') }}" class="nav-link {% if request.endpoint == 'manager.dashboard' %}active{% endif %}">
+        <span class="nav-icon">⊞</span> Dashboard
+      </a>
+      {% endif %}
+
+      <div class="nav-section-label">Inventory</div>
+      {% if role == 'admin' %}
+      <a href="{{ url_for('admin.products') }}" class="nav-link {% if request.endpoint == 'admin.products' %}active{% endif %}">
+        <span class="nav-icon">📦</span> Products
+      </a>
+      <a href="{{ url_for('admin.inventory') }}" class="nav-link {% if request.endpoint == 'admin.inventory' %}active{% endif %}">
+        <span class="nav-icon">🗃</span> Inventory Data
+      </a>
+      {% elif role == 'manager' %}
+      <a href="{{ url_for('manager.inventory') }}" class="nav-link {% if request.endpoint == 'manager.inventory' %}active{% endif %}">
+        <span class="nav-icon">🗃</span> My Inventory
+      </a>
+      {% endif %}
+
+      <div class="nav-section-label">Orders & Logistics</div>
+      {% if role == 'admin' %}
+      <a href="{{ url_for('admin.shipments') }}" class="nav-link {% if request.endpoint == 'admin.shipments' %}active{% endif %}">
+        <span class="nav-icon">🚚</span> Shipments
+      </a>
+      {% elif role == 'manager' %}
+      <a href="{{ url_for('manager.shipments') }}" class="nav-link {% if request.endpoint == 'manager.shipments' %}active{% endif %}">
+        <span class="nav-icon">🚚</span> Shipments
+      </a>
+      {% endif %}
+
+      <div class="nav-section-label">Commerce</div>
+      {% if role == 'admin' %}
+      <a href="{{ url_for('admin.sales') }}" class="nav-link {% if request.endpoint == 'admin.sales' %}active{% endif %}">
+        <span class="nav-icon">📈</span> Sales Data
+      </a>
+      <a href="{{ url_for('admin.promotions') }}" class="nav-link {% if request.endpoint == 'admin.promotions' %}active{% endif %}">
+        <span class="nav-icon">🎁</span> Promotions
+      </a>
+      {% elif role == 'manager' %}
+      <a href="{{ url_for('manager.sales') }}" class="nav-link {% if request.endpoint == 'manager.sales' %}active{% endif %}">
+        <span class="nav-icon">📈</span> Sales
+      </a>
+      <a href="{{ url_for('manager.promotions') }}" class="nav-link {% if request.endpoint == 'manager.promotions' %}active{% endif %}">
+        <span class="nav-icon">🎁</span> Promotions
+      </a>
+      {% endif %}
+
+      {% if role == 'admin' %}
+      <div class="nav-section-label">Planning</div>
+      <a href="{{ url_for('admin.seasonal_plan') }}" class="nav-link {% if request.endpoint == 'admin.seasonal_plan' %}active{% endif %}">
+        <span class="nav-icon">📅</span> Seasonal Plan
+      </a>
+
+      <div class="nav-section-label">System</div>
+      <a href="{{ url_for('admin.users') }}" class="nav-link {% if request.endpoint == 'admin.users' %}active{% endif %}">
+        <span class="nav-icon">👥</span> Users
+      </a>
+      <a href="{{ url_for('admin.sites') }}" class="nav-link {% if request.endpoint == 'admin.sites' %}active{% endif %}">
+        <span class="nav-icon">🏪</span> Sites
+      </a>
+      {% endif %}
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="user-pill">
+        <div class="user-avatar">{{ session.get('username', session.get('name', 'U'))[0].upper() }}</div>
+        <div class="user-meta">
+          <div class="user-name-sm">{{ session.get('username', session.get('name', 'User')) }}</div>
+          <div class="user-role-sm">{{ session.get('role', 'User')|capitalize }}</div>
+        </div>
+        <span style="font-size:12px;color:rgba(255,255,255,.3);">⋯</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- TOP NAV -->
+  <header class="topnav">
+    <div class="topnav-left">
+      <span class="topnav-heading">INVENTORY</span>
+      <span class="topnav-sep">/</span>
+      <span class="topnav-breadcrumb">{% block breadcrumb %}Dashboard{% endblock %}</span>
+    </div>
+    <div class="topnav-search">
+      <span style="font-size:14px;color:#94a3b8;">🔍</span>
+      <input type="text" placeholder="Search products, orders…"/>
+    </div>
+    <div class="topnav-right">
+      <button class="icon-btn" title="Notifications">🔔<span class="notif-dot"></span></button>
+      <button class="icon-btn" title="Settings">⚙</button>
+      <a href="{{ url_for('auth.logout') }}" class="btn-logout"><span>↩</span> Logout</a>
+    </div>
+  </header>
+
+  <!-- MAIN -->
+  <main class="main-content">
+    <div class="content-inner">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for category, message in messages %}
+            <div class="flash {{ 'success' if category == 'success' else 'error' if category == 'error' else 'info' }}">
+              {{ '✓' if category == 'success' else '⚠' if category == 'error' else 'ℹ' }}
+              {{ message }}
+            </div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+      {% block content %}{% endblock %}
+    </div>
+  </main>
+
+  {% block extra_js %}{% endblock %}
+</body>
+</html>

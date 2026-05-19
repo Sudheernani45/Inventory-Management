@@ -1,0 +1,249 @@
+{% extends "admin/base.html" %}
+{% block title %}Suppliers{% endblock %}
+{% block page_title %}Suppliers{% endblock %}
+{% block content %}
+
+<!-- Page Header -->
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px">
+  <div>
+    <h2 style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:1.3rem;color:var(--text);margin:0">Supplier Management</h2>
+    <p style="color:var(--muted);font-size:.82rem;margin:4px 0 0">Manage all product suppliers, contacts and details.</p>
+  </div>
+  <button class="btn btn-primary" onclick="openAddModal()">
+    <i class="fas fa-plus-circle"></i> Add Supplier
+  </button>
+</div>
+
+<!-- Stats Strip -->
+<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px" id="supplierStats">
+  <div class="card" style="padding:18px 22px;display:flex;align-items:center;gap:14px;margin:0">
+    <div style="width:42px;height:42px;border-radius:12px;background:var(--accent-dim);display:flex;align-items:center;justify-content:center;color:var(--accent);font-size:1rem"><i class="fas fa-truck-ramp-box"></i></div>
+    <div><div id="totalSuppliers" style="font-size:1.5rem;font-weight:800;font-family:'Plus Jakarta Sans',sans-serif">—</div><div style="font-size:.72rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.06em">Total Suppliers</div></div>
+  </div>
+  <div class="card" style="padding:18px 22px;display:flex;align-items:center;gap:14px;margin:0">
+    <div style="width:42px;height:42px;border-radius:12px;background:var(--blue-dim);display:flex;align-items:center;justify-content:center;color:var(--blue);font-size:1rem"><i class="fas fa-envelope"></i></div>
+    <div><div id="suppliersWithEmail" style="font-size:1.5rem;font-weight:800;font-family:'Plus Jakarta Sans',sans-serif">—</div><div style="font-size:.72rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.06em">With Email</div></div>
+  </div>
+  <div class="card" style="padding:18px 22px;display:flex;align-items:center;gap:14px;margin:0">
+    <div style="width:42px;height:42px;border-radius:12px;background:var(--success-dim);display:flex;align-items:center;justify-content:center;color:var(--success);font-size:1rem"><i class="fas fa-phone"></i></div>
+    <div><div id="suppliersWithPhone" style="font-size:1.5rem;font-weight:800;font-family:'Plus Jakarta Sans',sans-serif">—</div><div style="font-size:.72rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.06em">With Phone</div></div>
+  </div>
+</div>
+
+<!-- Suppliers Table Card -->
+<div class="card">
+  <div class="card-header">
+    <div class="card-title"><i class="fas fa-truck-ramp-box" style="color:var(--accent)"></i> All Suppliers</div>
+    <input type="text" class="form-control" id="supplierSearch" placeholder="Search suppliers…" oninput="filterSuppliers()" style="width:240px"/>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Supplier PK</th>
+          <th>Supplier Name</th>
+          <th>Email</th>
+          <th>Phone</th>
+          <th style="text-align:right">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="supplierTbody">
+        <tr><td colspan="5"><div class="empty-state"><span class="spinner"></span></div></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ══════════ ADD SUPPLIER MODAL ══════════ -->
+<div id="addModalOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;align-items:center;justify-content:center;backdrop-filter:blur(4px)">
+  <div style="background:var(--surface);border-radius:20px;width:100%;max-width:460px;padding:32px 30px 26px;box-shadow:0 20px 60px rgba(0,0,0,.2);margin:16px;position:relative">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px">
+      <div>
+        <h2 style="font-family:'Plus Jakarta Sans',sans-serif;font-size:1.15rem;font-weight:800;color:var(--text);margin:0">Add Supplier</h2>
+        <p style="font-size:.78rem;color:var(--muted);margin:4px 0 0">Fill in the supplier details below</p>
+      </div>
+      <button onclick="closeAddModal()" style="background:var(--surface2);border:none;border-radius:50%;width:34px;height:34px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:.95rem;transition:background .15s" onmouseover="this.style.background='var(--border)'" onmouseout="this.style.background='var(--surface2)'">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:16px">
+      <div class="form-group">
+        <label class="form-label" style="font-weight:600">Supplier Name <span style="color:var(--danger)">*</span></label>
+        <input type="text" class="form-control" id="addSupName" placeholder="e.g. FreshFoods Co." style="height:46px;border-radius:10px"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label" style="font-weight:600">Email <span style="color:var(--danger)">*</span></label>
+        <input type="email" class="form-control" id="addSupEmail" placeholder="supplier@example.com" style="height:46px;border-radius:10px"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label" style="font-weight:600">Phone</label>
+        <input type="text" class="form-control" id="addSupPhone" placeholder="+91 98765 43210" style="height:46px;border-radius:10px"/>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:12px;justify-content:flex-end;margin-top:24px">
+      <button onclick="closeAddModal()" class="btn" style="background:#fff;border:1.5px solid var(--border);color:var(--text);padding:11px 22px;border-radius:10px;font-weight:600;font-size:.88rem">Cancel</button>
+      <button class="btn btn-primary" onclick="submitAddSupplier()" style="padding:11px 24px;border-radius:10px;font-weight:700;font-size:.88rem">
+        <i class="fas fa-plus"></i> Add Supplier
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ EDIT SUPPLIER MODAL ══════════ -->
+<div id="editModalOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;align-items:center;justify-content:center;backdrop-filter:blur(4px)">
+  <div style="background:var(--surface);border-radius:20px;width:100%;max-width:460px;padding:32px 30px 26px;box-shadow:0 20px 60px rgba(0,0,0,.2);margin:16px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px">
+      <div>
+        <h2 style="font-family:'Plus Jakarta Sans',sans-serif;font-size:1.15rem;font-weight:800;color:var(--text);margin:0">Edit Supplier</h2>
+        <p style="font-size:.78rem;color:var(--muted);margin:4px 0 0" id="editSupPkLabel">—</p>
+      </div>
+      <button onclick="closeEditModal()" style="background:var(--surface2);border:none;border-radius:50%;width:34px;height:34px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:.95rem;transition:background .15s" onmouseover="this.style.background='var(--border)'" onmouseout="this.style.background='var(--surface2)'">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+
+    <input type="hidden" id="editSupId"/>
+    <div style="display:flex;flex-direction:column;gap:16px">
+      <div class="form-group">
+        <label class="form-label" style="font-weight:600">Supplier Name <span style="color:var(--danger)">*</span></label>
+        <input type="text" class="form-control" id="editSupName" style="height:46px;border-radius:10px"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label" style="font-weight:600">Email <span style="color:var(--danger)">*</span></label>
+        <input type="email" class="form-control" id="editSupEmail" style="height:46px;border-radius:10px"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label" style="font-weight:600">Phone</label>
+        <input type="text" class="form-control" id="editSupPhone" style="height:46px;border-radius:10px"/>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:12px;justify-content:flex-end;margin-top:24px">
+      <button onclick="closeEditModal()" class="btn" style="background:#fff;border:1.5px solid var(--border);color:var(--text);padding:11px 22px;border-radius:10px;font-weight:600;font-size:.88rem">Cancel</button>
+      <button class="btn btn-primary" onclick="submitEditSupplier()" style="padding:11px 24px;border-radius:10px;font-weight:700;font-size:.88rem">
+        <i class="fas fa-save"></i> Save Changes
+      </button>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+let allSuppliers = [];
+
+async function loadSuppliers(){
+  const {ok,data} = await apiFetch('/admin/suppliers');
+  if(!ok){ showToast('Failed to load suppliers','error'); return; }
+  allSuppliers = data;
+  updateStats(data);
+  renderTable(data);
+}
+
+function updateStats(data){
+  document.getElementById('totalSuppliers').textContent = data.length;
+  document.getElementById('suppliersWithEmail').textContent = data.filter(s=>s.email).length;
+  document.getElementById('suppliersWithPhone').textContent = data.filter(s=>s.phone).length;
+}
+
+function renderTable(data){
+  const tbody = document.getElementById('supplierTbody');
+  if(!data.length){
+    tbody.innerHTML='<tr><td colspan="5"><div class="empty-state"><i class="fas fa-truck-ramp-box"></i><p>No suppliers yet. Add your first supplier.</p></div></td></tr>';
+    return;
+  }
+  tbody.innerHTML = data.map(s=>`<tr>
+    <td><span class="badge badge-gray" style="font-family:monospace;font-size:.75rem">${s.supplier_id}</span></td>
+    <td style="font-weight:600;color:var(--text)">${s.supplier_name}</td>
+    <td>${s.email ? `<a href="mailto:${s.email}" style="color:var(--blue);text-decoration:none">${s.email}</a>` : '<span style="color:var(--muted2)">—</span>'}</td>
+    <td style="color:var(--muted)">${s.phone||'—'}</td>
+    <td>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button class="btn btn-sm" onclick="openEditModal(${s.id},'${s.supplier_id}','${escHtml(s.supplier_name)}','${s.email||''}','${s.phone||''}')" style="background:var(--surface2);border:1.5px solid var(--border);color:var(--text);padding:6px 14px;border-radius:8px;font-size:.78rem;font-weight:600;cursor:pointer;transition:all .14s" onmouseover="this.style.background='var(--surface3)'" onmouseout="this.style.background='var(--surface2)'">
+          <i class="fas fa-pen"></i> Edit
+        </button>
+        <button class="btn btn-sm btn-danger" onclick="deleteSupplier(${s.id},'${escHtml(s.supplier_name)}')" style="padding:6px 14px;border-radius:8px;font-size:.78rem;font-weight:600">
+          <i class="fas fa-trash"></i>
+        </button>
+      </div>
+    </td>
+  </tr>`).join('');
+}
+
+function escHtml(s){ return String(s).replace(/'/g,"&#39;").replace(/"/g,"&quot;"); }
+
+function filterSuppliers(){
+  const q = document.getElementById('supplierSearch').value.toLowerCase();
+  const filtered = allSuppliers.filter(s=>
+    s.supplier_name.toLowerCase().includes(q) ||
+    (s.email||'').toLowerCase().includes(q) ||
+    s.supplier_id.toLowerCase().includes(q)
+  );
+  renderTable(filtered);
+}
+
+// ── Add Modal ──
+function openAddModal(){
+  document.getElementById('addSupName').value='';
+  document.getElementById('addSupEmail').value='';
+  document.getElementById('addSupPhone').value='';
+  document.getElementById('addModalOverlay').style.display='flex';
+  setTimeout(()=>document.getElementById('addSupName').focus(),80);
+}
+function closeAddModal(){ document.getElementById('addModalOverlay').style.display='none'; }
+
+async function submitAddSupplier(){
+  const name  = document.getElementById('addSupName').value.trim();
+  const email = document.getElementById('addSupEmail').value.trim();
+  const phone = document.getElementById('addSupPhone').value.trim();
+  if(!name||!email){ showToast('Supplier name and email are required','error'); return; }
+  const {ok,data} = await apiFetch('/admin/suppliers/add',{method:'POST',body:JSON.stringify({supplier_name:name,email,phone})});
+  if(ok && data.status==='success'){
+    showToast(data.message,'success');
+    closeAddModal();
+    loadSuppliers();
+  } else showToast(data.message||'Error adding supplier','error');
+}
+
+// ── Edit Modal ──
+function openEditModal(id, supId, name, email, phone){
+  document.getElementById('editSupId').value = id;
+  document.getElementById('editSupPkLabel').textContent = supId;
+  document.getElementById('editSupName').value = name;
+  document.getElementById('editSupEmail').value = email;
+  document.getElementById('editSupPhone').value = phone;
+  document.getElementById('editModalOverlay').style.display='flex';
+}
+function closeEditModal(){ document.getElementById('editModalOverlay').style.display='none'; }
+
+async function submitEditSupplier(){
+  const id    = document.getElementById('editSupId').value;
+  const name  = document.getElementById('editSupName').value.trim();
+  const email = document.getElementById('editSupEmail').value.trim();
+  const phone = document.getElementById('editSupPhone').value.trim();
+  if(!name||!email){ showToast('Name and email are required','error'); return; }
+  const {ok,data} = await apiFetch(`/admin/suppliers/${id}/edit`,{method:'POST',body:JSON.stringify({supplier_name:name,email,phone})});
+  if(ok && data.status==='success'){
+    showToast('Supplier updated','success');
+    closeEditModal();
+    loadSuppliers();
+  } else showToast(data.message||'Error','error');
+}
+
+async function deleteSupplier(id, name){
+  // proceed
+  const {ok,data} = await apiFetch(`/admin/suppliers/${id}/delete`,{method:'POST'});
+  if(ok && data.status==='success'){ showToast('Supplier deleted','info'); loadSuppliers(); }
+  else showToast(data.message||'Error','error');
+}
+
+// Close modals on overlay click
+['addModalOverlay','editModalOverlay'].forEach(id=>{
+  document.getElementById(id).addEventListener('click',function(e){if(e.target===this)this.style.display='none';});
+});
+
+loadSuppliers();
+</script>
+{% endblock %}

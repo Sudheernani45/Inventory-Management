@@ -1,0 +1,254 @@
+{% extends "manager/base.html" %}
+{% block title %}Products{% endblock %}
+{% block page_title %}<i class="fas fa-boxes-stacked" style="color:var(--accent);margin-right:8px"></i>Products{% endblock %}
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <div class="card-title"><i class="fas fa-boxes-stacked" style="color:var(--accent)"></i> Product Catalogue</div>
+    <div class="product-search-wrap">
+      <div class="product-search-field">
+        <i class="fas fa-magnifying-glass search-icon"></i>
+        <input type="text" class="search-input" id="searchInput" placeholder="Search products…" oninput="debounceLoad();toggleSearchClear(this)" autocomplete="off"/>
+        <button class="search-clear" onclick="clearMgrSearch()" tabindex="-1" title="Clear"><i class="fas fa-xmark"></i></button>
+      </div>
+      <select class="product-cat-filter" id="catFilter" onchange="loadProducts(1)">
+        <option value="">All Categories</option>
+      </select>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Product ID</th><th>Name</th><th>Category</th><th>Subcategory</th>
+          <th>Unit Cost</th><th>Unit Price</th><th>Supplier</th><th>Shelf Life</th><th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="productsTbody">
+        <tr><td colspan="9"><div class="empty-state"><span class="spinner"></span></div></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="pagination" id="pagination"></div>
+</div>
+
+<!-- VIEW PRODUCT MODAL -->
+<div class="modal-overlay" id="viewModal">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-header">
+      <div class="modal-title"><i class="fas fa-eye" style="color:var(--accent)"></i> Product Details</div>
+      <button class="modal-close" onclick="closeModal('viewModal')">×</button>
+    </div>
+    <div id="viewModalBody" style="padding:4px 0"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('viewModal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT PRODUCT MODAL -->
+<div class="modal-overlay" id="editModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title"><i class="fas fa-pen" style="color:var(--accent)"></i> Edit Product</div>
+      <button class="modal-close" onclick="closeModal('editModal')">×</button>
+    </div>
+    <input type="hidden" id="eProductId"/>
+    <div class="form-grid">
+      <div class="form-group">
+        <label class="form-label">Product ID</label>
+        <input type="text" class="form-control" id="eProductIdDisplay" readonly/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Product Name *</label>
+        <input type="text" class="form-control" id="eProductName"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Category</label>
+        <input type="text" class="form-control" id="eCategory"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Subcategory</label>
+        <input type="text" class="form-control" id="eSubcategory"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Unit Cost (₹)</label>
+        <input type="number" class="form-control" id="eUnitCost" step="0.01"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Unit Price (₹)</label>
+        <input type="number" class="form-control" id="eUnitPrice" step="0.01"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Supplier</label>
+        <input type="text" class="form-control" id="eSupplier"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Shelf Life (days)</label>
+        <input type="number" class="form-control" id="eShelfLife"/>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('editModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveEdit()"><i class="fas fa-save"></i> Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- CONFIRM DELETE MODAL -->
+<div class="modal-overlay" id="deleteModal">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header">
+      <div class="modal-title" style="color:var(--danger)"><i class="fas fa-trash"></i> Delete Product</div>
+      <button class="modal-close" onclick="closeModal('deleteModal')">×</button>
+    </div>
+    <p style="color:var(--muted);font-size:.88rem;margin-bottom:8px">Are you sure you want to delete product <strong id="deleteProductName"></strong>? This cannot be undone.</p>
+    <input type="hidden" id="deleteProductId"/>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('deleteModal')">Cancel</button>
+      <button class="btn btn-danger" onclick="confirmDelete()"><i class="fas fa-trash"></i> Delete</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+let currentPage = 1;
+let _debounce;
+function debounceLoad(){ clearTimeout(_debounce); _debounce = setTimeout(()=>loadProducts(1), 350); }
+function toggleSearchClear(inp){ /* handled by CSS */ }
+function clearMgrSearch(){ const el=document.getElementById('searchInput'); el.value=''; el.focus(); loadProducts(1); }
+
+async function loadCategories(){
+  try {
+    const r = await fetch('/manager/api/categories');
+    const cats = await r.json();
+    const sel = document.getElementById('catFilter');
+    cats.forEach(c => { const o=document.createElement('option'); o.value=c; o.textContent=c; sel.appendChild(o); });
+  } catch(e){}
+}
+
+async function loadProducts(page=1){
+  currentPage = page;
+  const q   = document.getElementById('searchInput').value.trim();
+  const cat = document.getElementById('catFilter').value;
+  let url = `/manager/api/products?page=${page}`;
+  if(q)   url += `&q=${encodeURIComponent(q)}`;
+  if(cat) url += `&category=${encodeURIComponent(cat)}`;
+  document.getElementById('productsTbody').innerHTML = '<tr><td colspan="9"><div class="empty-state"><span class="spinner"></span></div></td></tr>';
+  try {
+    const {ok,data} = await apiFetch(url);
+    if(!ok){ document.getElementById('productsTbody').innerHTML='<tr><td colspan="9"><div class="empty-state"><i class="fas fa-exclamation-triangle"></i><p>Error loading products</p></div></td></tr>'; return; }
+    renderProducts(data.products||[], data.total||0, data.per_page||20);
+  } catch(e){}
+}
+
+function renderProducts(products, total, perPage){
+  const tbody = document.getElementById('productsTbody');
+  if(!products.length){ tbody.innerHTML='<tr><td colspan="9"><div class="empty-state"><i class="fas fa-boxes-stacked"></i><p>No products found</p></div></td></tr>'; renderPagination(0,perPage); return; }
+  tbody.innerHTML = products.map(p=>`<tr>
+    <td style="font-family:monospace;color:var(--accent);font-weight:600">${p.product_id}</td>
+    <td style="font-weight:500">${p.product_name||'—'}</td>
+    <td><span class="badge badge-blue">${p.category||'—'}</span></td>
+    <td style="color:var(--muted)">${p.subcategory||'—'}</td>
+    <td>₹${Number(p.unit_cost||0).toLocaleString('en-IN',{maximumFractionDigits:2})}</td>
+    <td>₹${Number(p.unit_price||0).toLocaleString('en-IN',{maximumFractionDigits:2})}</td>
+    <td style="color:var(--muted)">${p.supplier||'—'}</td>
+    <td style="color:var(--muted)">${p.shelf_life||0} days</td>
+    <td style="display:flex;gap:4px;align-items:center">
+      <button class="btn btn-ghost btn-sm btn-icon" onclick="openView(${JSON.stringify(p).replace(/"/g,'&quot;')})" title="View"><i class="fas fa-eye" style="color:var(--accent)"></i></button>
+      <button class="btn btn-ghost btn-sm btn-icon" onclick="openEdit(${JSON.stringify(p).replace(/"/g,'&quot;')})" title="Edit"><i class="fas fa-pen" style="color:var(--warn)"></i></button>
+      <button class="btn btn-ghost btn-sm btn-icon" onclick="openDelete('${p.product_id}','${(p.product_name||'').replace(/'/g,"\\'")}')" title="Delete"><i class="fas fa-trash" style="color:var(--danger)"></i></button>
+    </td>
+  </tr>`).join('');
+  renderPagination(total, perPage);
+}
+
+function renderPagination(total, perPage){
+  const pages = Math.ceil(total / perPage);
+  const el = document.getElementById('pagination');
+  if(pages<=1){el.innerHTML='';return;}
+  let html = '';
+  for(let i=1;i<=Math.min(pages,10);i++) html+=`<button class="page-btn${i===currentPage?' active':''}" onclick="loadProducts(${i})">${i}</button>`;
+  html+=`<span class="page-info">Page ${currentPage} of ${pages} (${total} total)</span>`;
+  el.innerHTML = html;
+}
+
+function openView(p){
+  const margin = p.unit_price && p.unit_cost ? ((p.unit_price - p.unit_cost)/p.unit_price*100).toFixed(1) : '—';
+  document.getElementById('viewModalBody').innerHTML = `
+    <div style="background:var(--surface2);border-radius:12px;padding:18px;display:flex;align-items:center;gap:14px;margin-bottom:16px">
+      <div style="width:48px;height:48px;border-radius:12px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;color:#fff;font-size:1.2rem;font-weight:700;flex-shrink:0">${(p.product_name||'P')[0].toUpperCase()}</div>
+      <div>
+        <div style="font-family:'Space Grotesk',sans-serif;font-size:1.05rem;font-weight:700">${p.product_name||'—'}</div>
+        <div style="color:var(--accent);font-family:monospace;font-weight:600;font-size:.88rem">${p.product_id}</div>
+      </div>
+      <span class="badge badge-blue" style="margin-left:auto">${p.category||'—'}</span>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      ${vfield('Subcategory', p.subcategory||'—')}
+      ${vfield('Supplier', p.supplier||'—')}
+      ${vfield('Unit Cost', '₹'+Number(p.unit_cost||0).toLocaleString('en-IN',{maximumFractionDigits:2}))}
+      ${vfield('Unit Price', '₹'+Number(p.unit_price||0).toLocaleString('en-IN',{maximumFractionDigits:2}))}
+      ${vfield('Shelf Life', (p.shelf_life||0)+' days')}
+      ${vfield('Margin', margin !== '—' ? margin+'%' : '—')}
+    </div>`;
+  openModal('viewModal');
+}
+
+function vfield(label, val){
+  return `<div style="background:var(--surface2);border-radius:9px;padding:12px">
+    <div style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:4px">${label}</div>
+    <div style="font-weight:500;font-size:.88rem">${val}</div>
+  </div>`;
+}
+
+function openEdit(p){
+  document.getElementById('eProductId').value        = p.product_id;
+  document.getElementById('eProductIdDisplay').value = p.product_id;
+  document.getElementById('eProductName').value      = p.product_name||'';
+  document.getElementById('eCategory').value         = p.category||'';
+  document.getElementById('eSubcategory').value      = p.subcategory||'';
+  document.getElementById('eUnitCost').value         = p.unit_cost||0;
+  document.getElementById('eUnitPrice').value        = p.unit_price||0;
+  document.getElementById('eSupplier').value         = p.supplier||'';
+  document.getElementById('eShelfLife').value        = p.shelf_life||0;
+  openModal('editModal');
+}
+
+async function saveEdit(){
+  const pid = document.getElementById('eProductId').value;
+  const body = {
+    product_name: document.getElementById('eProductName').value.trim(),
+    category:     document.getElementById('eCategory').value.trim(),
+    subcategory:  document.getElementById('eSubcategory').value.trim(),
+    unit_cost:    document.getElementById('eUnitCost').value,
+    unit_price:   document.getElementById('eUnitPrice').value,
+    supplier:     document.getElementById('eSupplier').value.trim(),
+    shelf_life:   document.getElementById('eShelfLife').value,
+  };
+  const {ok,data} = await apiFetch(`/manager/products/${pid}/edit`, {method:'POST',body:JSON.stringify(body)});
+  if(ok && data.status==='success'){ closeModal('editModal'); showToast('Product updated','success'); loadProducts(currentPage); }
+  else showToast(data.message||'Error updating product','error');
+}
+
+function openDelete(pid, pname){
+  document.getElementById('deleteProductId').value   = pid;
+  document.getElementById('deleteProductName').textContent = pname;
+  openModal('deleteModal');
+}
+
+async function confirmDelete(){
+  const pid = document.getElementById('deleteProductId').value;
+  const {ok,data} = await apiFetch(`/manager/products/${pid}/delete`,{method:'POST'});
+  if(ok && data.status==='success'){ closeModal('deleteModal'); showToast('Product deleted','success'); loadProducts(currentPage); }
+  else showToast(data.message||'Error','error');
+}
+
+function openModal(id){ document.getElementById(id).classList.add('open'); }
+function closeModal(id){ document.getElementById(id).classList.remove('open'); }
+
+loadCategories();
+loadProducts(1);
+</script>
+{% endblock %}

@@ -1,0 +1,315 @@
+{% extends "manager/base.html" %}
+{% block title %}Purchase Orders{% endblock %}
+{% block page_title %}<i class="fas fa-file-invoice" style="color:var(--accent);margin-right:8px"></i>Purchase Orders{% endblock %}
+{% block content %}
+
+<!-- Header -->
+<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:24px;gap:12px;flex-wrap:wrap">
+  <div>
+    <h2 style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:1.3rem;color:var(--text);margin:0">Purchase Orders</h2>
+    <p style="color:var(--muted);font-size:.82rem;margin:4px 0 0">Create and manage supplier purchase orders for your site.</p>
+  </div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap">
+    <button class="btn" onclick="openAddSupplierModal()" style="background:var(--surface);border:1.5px solid var(--border);color:var(--text);padding:10px 18px;border-radius:10px;font-weight:600;font-size:.84rem;cursor:pointer;display:flex;align-items:center;gap:7px">
+      <i class="fas fa-plus" style="color:var(--accent)"></i> Add Supplier
+    </button>
+    <button class="btn btn-primary" onclick="openPOModal()"><i class="fas fa-plus-circle"></i> New Purchase Order</button>
+  </div>
+</div>
+
+<!-- Stats -->
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px">
+  <div class="card" style="padding:16px 18px;margin:0">
+    <div style="font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;font-weight:600">Total Orders</div>
+    <div style="font-size:1.5rem;font-weight:800;font-family:'Plus Jakarta Sans',sans-serif;color:var(--text);margin-top:4px" id="poStatTotal">—</div>
+  </div>
+  <div class="card" style="padding:16px 18px;margin:0">
+    <div style="font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;font-weight:600">Pending</div>
+    <div style="font-size:1.5rem;font-weight:800;font-family:'Plus Jakarta Sans',sans-serif;color:var(--warn);margin-top:4px" id="poStatPending">—</div>
+  </div>
+  <div class="card" style="padding:16px 18px;margin:0">
+    <div style="font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;font-weight:600">Approved</div>
+    <div style="font-size:1.5rem;font-weight:800;font-family:'Plus Jakarta Sans',sans-serif;color:var(--success);margin-top:4px" id="poStatApproved">—</div>
+  </div>
+  <div class="card" style="padding:16px 18px;margin:0">
+    <div style="font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;font-weight:600">Total Value</div>
+    <div style="font-size:1.1rem;font-weight:800;font-family:'Plus Jakarta Sans',sans-serif;color:var(--accent);margin-top:4px" id="poStatValue">—</div>
+  </div>
+</div>
+
+<!-- Search + Filter -->
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+    <div class="search-box">
+      <i class="fas fa-search"></i>
+      <input type="text" class="form-control" id="poSearch" placeholder="Search PO, supplier, product…" oninput="debouncePO()" style="width:240px"/>
+    </div>
+    <select class="form-control" id="poStatusFilter" onchange="loadPOs()" style="width:140px">
+      <option value="">All Statuses</option>
+      <option value="Pending">Pending</option>
+      <option value="Approved">Approved</option>
+      <option value="Cancelled">Cancelled</option>
+    </select>
+  </div>
+  <span id="poCountLabel" style="font-size:.78rem;color:var(--muted)"></span>
+</div>
+
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>PO #</th><th>Supplier</th><th>Product</th><th>Qty</th><th>Unit Cost</th><th>Total</th><th>Site</th><th>Expected</th><th>Status</th><th style="text-align:right">Actions</th></tr></thead>
+      <tbody id="poTbody">
+        <tr class="skeleton-row"><td><div class="skeleton" style="height:13px;width:80px"></div></td><td><div class="skeleton" style="height:13px"></div></td><td><div class="skeleton" style="height:13px;width:80%"></div></td><td><div class="skeleton" style="height:13px;width:40%"></div></td><td><div class="skeleton" style="height:13px;width:60%"></div></td><td><div class="skeleton" style="height:13px;width:60%"></div></td><td><div class="skeleton" style="height:13px;width:70%"></div></td><td><div class="skeleton" style="height:13px;width:55%"></div></td><td><div class="skeleton" style="height:22px;width:70px;border-radius:20px"></div></td><td><div class="skeleton" style="height:28px;width:80px;border-radius:8px"></div></td></tr>
+        <tr class="skeleton-row"><td><div class="skeleton" style="height:13px;width:80px"></div></td><td><div class="skeleton" style="height:13px"></div></td><td><div class="skeleton" style="height:13px;width:80%"></div></td><td><div class="skeleton" style="height:13px;width:40%"></div></td><td><div class="skeleton" style="height:13px;width:60%"></div></td><td><div class="skeleton" style="height:13px;width:60%"></div></td><td><div class="skeleton" style="height:13px;width:70%"></div></td><td><div class="skeleton" style="height:13px;width:55%"></div></td><td><div class="skeleton" style="height:22px;width:70px;border-radius:20px"></div></td><td><div class="skeleton" style="height:28px;width:80px;border-radius:8px"></div></td></tr>
+        <tr class="skeleton-row"><td><div class="skeleton" style="height:13px;width:80px"></div></td><td><div class="skeleton" style="height:13px"></div></td><td><div class="skeleton" style="height:13px;width:80%"></div></td><td><div class="skeleton" style="height:13px;width:40%"></div></td><td><div class="skeleton" style="height:13px;width:60%"></div></td><td><div class="skeleton" style="height:13px;width:60%"></div></td><td><div class="skeleton" style="height:13px;width:70%"></div></td><td><div class="skeleton" style="height:13px;width:55%"></div></td><td><div class="skeleton" style="height:22px;width:70px;border-radius:20px"></div></td><td><div class="skeleton" style="height:28px;width:80px;border-radius:8px"></div></td></tr>
+        <tr class="skeleton-row"><td><div class="skeleton" style="height:13px;width:80px"></div></td><td><div class="skeleton" style="height:13px"></div></td><td><div class="skeleton" style="height:13px;width:80%"></div></td><td><div class="skeleton" style="height:13px;width:40%"></div></td><td><div class="skeleton" style="height:13px;width:60%"></div></td><td><div class="skeleton" style="height:13px;width:60%"></div></td><td><div class="skeleton" style="height:13px;width:70%"></div></td><td><div class="skeleton" style="height:13px;width:55%"></div></td><td><div class="skeleton" style="height:22px;width:70px;border-radius:20px"></div></td><td><div class="skeleton" style="height:28px;width:80px;border-radius:8px"></div></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+
+<!-- PO VIEW MODAL -->
+<div id="poViewModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:2500;align-items:center;justify-content:center;backdrop-filter:blur(4px)" onclick="if(event.target===this)this.style.display='none'">
+  <div style="background:var(--surface);border-radius:18px;width:100%;max-width:500px;margin:16px;box-shadow:0 24px 80px rgba(0,0,0,.3);overflow:hidden">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 22px;border-bottom:1px solid var(--border)">
+      <div style="font-family:'Plus Jakarta Sans',sans-serif;font-weight:800;font-size:.95rem;color:var(--text)"><i class="fas fa-file-invoice" style="color:var(--accent);margin-right:8px"></i>Purchase Order Details</div>
+      <button onclick="document.getElementById('poViewModal').style.display='none'" style="background:var(--surface2);border:none;border-radius:50%;width:30px;height:30px;cursor:pointer;color:var(--muted)"><i class="fas fa-times"></i></button>
+    </div>
+    <div style="padding:20px 22px;display:grid;grid-template-columns:1fr 1fr;gap:12px" id="poViewBody"></div>
+    <div style="padding:0 22px 18px;display:flex;gap:8px">
+      <button onclick="document.getElementById('poViewModal').style.display='none'" style="flex:1;background:var(--surface2);border:1.5px solid var(--border);color:var(--text);padding:10px;border-radius:10px;font-weight:600;cursor:pointer">Close</button>
+      <button id="mgr_poInvoiceBtn" onclick="openMgrPOInvoice()" style="flex:1;background:linear-gradient(135deg,#0e3d6e,#1565c0);color:#fff;padding:10px;border-radius:10px;font-weight:700;border:none;cursor:pointer"><i class="fas fa-file-invoice"></i>&nbsp; Invoice / PDF</button>
+    </div>
+  </div>
+</div>
+
+<!-- NEW PO MODAL -->
+<div id="poModalOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:1000;align-items:center;justify-content:center;backdrop-filter:blur(4px)">
+  <div style="background:var(--surface);border-radius:20px;width:100%;max-width:500px;padding:0;box-shadow:0 24px 80px rgba(0,0,0,.22);margin:16px;max-height:92vh;overflow-y:auto">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:24px 26px 18px;border-bottom:1px solid var(--border)">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div style="width:36px;height:36px;border-radius:10px;background:var(--accent-dim);display:flex;align-items:center;justify-content:center;color:var(--accent);font-size:.9rem"><i class="fas fa-file-invoice"></i></div>
+        <h2 style="font-family:'Plus Jakarta Sans',sans-serif;font-size:1.05rem;font-weight:800;color:var(--text);margin:0">New Purchase Order</h2>
+      </div>
+      <button onclick="closePOModal()" style="background:var(--surface2);border:none;border-radius:50%;width:32px;height:32px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:.85rem"><i class="fas fa-times"></i></button>
+    </div>
+    <div style="padding:22px 26px;display:flex;flex-direction:column;gap:15px">
+      <div class="form-group">
+        <label class="form-label" style="font-weight:600;font-size:.82rem">Supplier <span style="color:var(--danger)">*</span></label>
+        <div style="position:relative">
+          <select class="form-control" id="poSupplier" style="height:44px;border-radius:10px;appearance:none;padding-right:34px">
+            <option value="">- Select Supplier -</option>
+          </select>
+          <i class="fas fa-chevron-down" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);color:var(--muted2);pointer-events:none;font-size:.72rem"></i>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label" style="font-weight:600;font-size:.82rem">Site <span style="color:var(--danger)">*</span></label>
+        <div style="position:relative">
+          <select class="form-control" id="poSite" style="height:44px;border-radius:10px;appearance:none;padding-right:34px">
+            <option value="">- Select Site -</option>
+          </select>
+          <i class="fas fa-chevron-down" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);color:var(--muted2);pointer-events:none;font-size:.72rem"></i>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label" style="font-weight:600;font-size:.82rem">Product <span style="color:var(--danger)">*</span></label>
+        <div style="position:relative">
+          <select class="form-control" id="poProduct" style="height:44px;border-radius:10px;appearance:none;padding-right:34px">
+            <option value="">- Select Product -</option>
+          </select>
+          <i class="fas fa-chevron-down" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);color:var(--muted2);pointer-events:none;font-size:.72rem"></i>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label" style="font-weight:600;font-size:.82rem">Quantity <span style="color:var(--danger)">*</span></label>
+        <input type="number" class="form-control" id="poQty" min="1" placeholder="Enter quantity" style="height:44px;border-radius:10px"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label" style="font-weight:600;font-size:.82rem">Order Date</label>
+        <input type="text" class="form-control" id="poOrderDate" readonly style="height:44px;border-radius:10px;background:var(--surface2);color:var(--muted)"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label" style="font-weight:600;font-size:.82rem">Expected Delivery <span style="color:var(--danger)">*</span></label>
+        <input type="date" class="form-control" id="poDelivery" style="height:44px;border-radius:10px"/>
+      </div>
+    </div>
+    <div style="display:flex;gap:12px;justify-content:flex-end;padding:0 26px 22px">
+      <button onclick="closePOModal()" class="btn" style="background:#fff;border:1.5px solid var(--border);color:var(--text);padding:10px 20px;border-radius:10px;font-weight:600;font-size:.85rem">Cancel</button>
+      <button class="btn btn-primary" onclick="createPO()" style="padding:10px 20px;border-radius:10px;font-weight:700;font-size:.85rem"><i class="fas fa-paper-plane"></i> Place Order &amp; Notify Supplier</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD SUPPLIER MODAL -->
+<div id="addSupModalOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:1010;align-items:center;justify-content:center;backdrop-filter:blur(4px)">
+  <div style="background:var(--surface);border-radius:20px;width:100%;max-width:420px;padding:0;box-shadow:0 24px 80px rgba(0,0,0,.22);margin:16px">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:22px 24px 16px;border-bottom:1px solid var(--border)">
+      <div>
+        <h2 style="font-family:'Plus Jakarta Sans',sans-serif;font-size:1rem;font-weight:800;color:var(--text);margin:0">Add New Supplier</h2>
+        <p style="font-size:.73rem;color:var(--muted);margin:4px 0 0">Create a new supplier record</p>
+      </div>
+      <button onclick="closeAddSupplierModal()" style="background:var(--surface2);border:none;border-radius:50%;width:32px;height:32px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:.85rem"><i class="fas fa-times"></i></button>
+    </div>
+    <div style="padding:20px 24px;display:flex;flex-direction:column;gap:14px">
+      <div class="form-group">
+        <label class="form-label" style="font-weight:600;font-size:.8rem">Supplier Name <span style="color:var(--danger)">*</span></label>
+        <input type="text" class="form-control" id="newSupName" placeholder="e.g. FreshFoods Co." style="height:44px;border-radius:10px"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label" style="font-weight:600;font-size:.8rem">Email <span style="color:var(--danger)">*</span></label>
+        <input type="email" class="form-control" id="newSupEmail" placeholder="supplier@email.com" style="height:44px;border-radius:10px"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label" style="font-weight:600;font-size:.8rem">Phone</label>
+        <input type="text" class="form-control" id="newSupPhone" placeholder="+91 98765 43210" style="height:44px;border-radius:10px"/>
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;padding:0 24px 20px">
+      <button onclick="closeAddSupplierModal()" class="btn" style="background:#fff;border:1.5px solid var(--border);color:var(--text);padding:10px 18px;border-radius:10px;font-weight:600;font-size:.82rem">Cancel</button>
+      <button class="btn btn-primary" onclick="submitNewSupplier()" style="padding:10px 18px;border-radius:10px;font-weight:700;font-size:.82rem"><i class="fas fa-plus"></i> Add Supplier</button>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+const STATUS_COLORS={'Pending':'badge-yellow','Approved':'badge-green','Cancelled':'badge-gray'};
+let productCatalog=[];
+
+function openPOModal(){
+  document.getElementById('poModalOverlay').style.display='flex';
+  const now=new Date();const pad=n=>String(n).padStart(2,'0');
+  document.getElementById('poOrderDate').value=`${pad(now.getDate())}-${pad(now.getMonth()+1)}-${now.getFullYear()} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  loadModalOptions();
+}
+function closePOModal(){
+  document.getElementById('poModalOverlay').style.display='none';
+  ['poQty','poDelivery'].forEach(id=>document.getElementById(id).value='');
+}
+document.getElementById('poModalOverlay').addEventListener('click',function(e){if(e.target===this)closePOModal();});
+
+async function loadModalOptions(){
+  try{
+    const {ok,data}=await apiFetch('/manager/api/products?page=1&per_page=200');
+    if(ok&&data.products){
+      productCatalog=data.products;
+      const s=document.getElementById('poProduct');
+      s.innerHTML='<option value="">- Select Product -</option>'+data.products.map(p=>`<option value="${p.product_id}">${p.product_name||p.product_id}</option>`).join('');
+    }
+  }catch(e){}
+  try{
+    const {ok,data}=await apiFetch('/api/sites-list');
+    if(ok&&data.sites){
+      const s=document.getElementById('poSite');
+      s.innerHTML='<option value="">- Select Site -</option>'+data.sites.map(si=>`<option value="${si.site_id}">${si.site_id} - ${si.site_name}</option>`).join('');
+    }
+  }catch(e){}
+  try{
+    const {ok,data}=await apiFetch('/manager/api/suppliers');
+    if(ok&&(data.suppliers||data).length){
+      const s=document.getElementById('poSupplier');
+      const sups=data.suppliers||data;s.innerHTML='<option value="">- Select Supplier -</option>'+sups.map(sup=>`<option value="${sup.supplier_name}">${sup.supplier_name}</option>`).join('');
+    }
+  }catch(e){}
+}
+
+async function createPO(){
+  const supplier=document.getElementById('poSupplier').value.trim();
+  const productId=document.getElementById('poProduct').value.trim();
+  const qty=parseInt(document.getElementById('poQty').value)||0;
+  const siteVal=document.getElementById('poSite').value.trim();
+  const delivery=document.getElementById('poDelivery').value;
+  if(!supplier||!productId||!qty||!siteVal||!delivery){showToast('Please fill all required fields','error');return;}
+  const prodInfo=productCatalog.find(p=>p.product_id===productId);
+  const productName=prodInfo?.product_name||productId;
+  const unitCost=Number(prodInfo?.unit_cost||0);
+  const siteSel=document.getElementById('poSite');const siteName=siteSel.options[siteSel.selectedIndex]?.text||siteVal;
+  const body={supplier,product_id:productId,product_name:productName,quantity:qty,unit_cost:unitCost,site:siteName,expected_delivery:delivery};
+  const {ok,data}=await apiFetch('/manager/api/purchase-orders',{method:'POST',body:JSON.stringify(body)});
+  if(ok&&data.status==='success'){showToast('Purchase Order '+data.message.split(' ')[2]+' created','success');closePOModal();loadPOs();}
+  else showToast(data.message||'Error','error');
+}
+
+let currentMgrPONum=null;
+function openMgrPOInvoice(){if(currentMgrPONum)window.open('/manager/invoice/po/'+currentMgrPONum,'_blank');}
+function openPOView(o){
+  currentMgrPONum=o.po_number||null;
+  const total=Number((o.quantity||0)*(o.unit_cost||0)).toLocaleString();
+  const fields=[['PO Number',o.po_number||'—',true],['Supplier',o.supplier||'—'],['Product',o.product_name||o.product_id||'—'],['Quantity',o.quantity||'—'],['Unit Cost','Rs '+Number(o.unit_cost||0).toLocaleString()],['Total Amount','Rs '+total],['Site',o.site||'—'],['Expected Delivery',o.delivery_date||o.expected_delivery||'—'],['Status',o.status||'—']];
+  document.getElementById('poViewBody').innerHTML=fields.map(([l,v,m])=>`<div style="background:var(--surface2);border-radius:9px;padding:12px 14px"><div style="font-size:.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:3px">${l}</div><div style="font-weight:600;font-size:.88rem;color:var(--text)${m?';font-family:monospace':''}">${v}</div></div>`).join('');
+  document.getElementById('poViewModal').style.display='flex';
+}
+let _poSearchT = null;
+function debouncePO(){clearTimeout(_poSearchT);_poSearchT=setTimeout(()=>loadPOs(),350);}
+
+async function loadPOs(){
+  const status = document.getElementById('poStatusFilter').value;
+  const q      = document.getElementById('poSearch')?.value?.trim() || '';
+  const tbody  = document.getElementById('poTbody');
+
+  let url = '/manager/api/purchase-orders';
+  const params = [];
+  if (status) params.push('status=' + encodeURIComponent(status));
+  if (params.length) url += '?' + params.join('&');
+
+  const {ok,data}=await apiFetch(url);
+  if(!ok){tbody.innerHTML='<tr><td colspan="10"><div class="empty-state"><p>Failed to load</p></div></td></tr>';return;}
+  let orders=(data.orders||data.records||[]);
+  if (q) { const ql=q.toLowerCase(); orders=orders.filter(o=>(o.po_number||'').toLowerCase().includes(ql)||(o.supplier||'').toLowerCase().includes(ql)||(o.product_name||'').toLowerCase().includes(ql)); }
+
+  // Update stats
+  const total=orders.length;
+  document.getElementById('poStatTotal').textContent    = data.total || total;
+  document.getElementById('poStatPending').textContent  = orders.filter(o=>o.status==='Pending').length;
+  document.getElementById('poStatApproved').textContent = orders.filter(o=>o.status==='Approved').length;
+  const tv=orders.reduce((s,o)=>s+Number((o.quantity||0)*(o.unit_cost||0)),0);
+  document.getElementById('poStatValue').textContent    = '₹'+tv.toLocaleString('en-IN',{maximumFractionDigits:0});
+  document.getElementById('poCountLabel').textContent   = `${total} order${total!==1?'s':''}`;
+
+  if(!orders.length){tbody.innerHTML='<tr><td colspan="10"><div class="empty-state"><i class="fas fa-file-invoice"></i><p>No purchase orders found</p></div></td></tr>';return;}
+  tbody.innerHTML=orders.map(o=>`<tr>
+    <td style="font-family:monospace;color:var(--accent);font-weight:600;font-size:.82rem">${o.po_number}</td>
+    <td style="font-weight:500">${o.supplier||'--'}</td>
+    <td>${o.product_name||o.product_id||'--'}</td>
+    <td>${o.quantity}</td>
+    <td>₹${Number(o.unit_cost||0).toLocaleString()}</td>
+    <td style="color:var(--success);font-weight:600">₹${Number((o.quantity||0)*(o.unit_cost||0)).toLocaleString()}</td>
+    <td style="color:var(--muted)">${o.site||'--'}</td>
+    <td style="color:var(--muted);font-size:.78rem">${o.delivery_date||o.expected_delivery||'--'}</td>
+    <td><span class="badge ${STATUS_COLORS[o.status]||'badge-gray'}">${o.status}</span></td>
+    <td style="text-align:right"><div style="display:flex;gap:5px;align-items:center;justify-content:flex-end">
+      <button class="btn btn-ghost btn-sm btn-icon" onclick='openPOView(${JSON.stringify(o).replace(/"/g,"&quot;")})' title="View"><i class="fas fa-eye" style="color:var(--accent)"></i></button>
+      <button class="btn btn-ghost btn-sm btn-icon" onclick="window.open('/manager/invoice/po/${o.po_number}','_blank')" title="Invoice / PDF"><i class="fas fa-file-invoice" style="color:#1565c0"></i></button>
+      ${o.status==='Pending'?`<button class="btn btn-success btn-sm" onclick="approvePO('${o.po_number}')"><i class="fas fa-check"></i> Approve</button><button class="btn btn-danger btn-sm" onclick="cancelPO('${o.po_number}')"><i class="fas fa-times"></i></button>`:''} 
+    </div></td>
+  </tr>`).join('');
+}
+async function approvePO(n){const {ok,data}=await apiFetch(`/manager/api/purchase-orders/${n}/approve`,{method:'POST'});if(ok&&data.status==='success'){showToast('Approved','success');loadPOs();}else showToast(data.message||'Error','error');}
+async function cancelPO(n){const {ok,data}=await apiFetch(`/manager/api/purchase-orders/${n}/cancel`,{method:'POST'});if(ok&&data.status==='success'){showToast('Cancelled','info');loadPOs();}else showToast(data.message||'Error','error');}
+
+function openAddSupplierModal(){
+  ['newSupName','newSupEmail','newSupPhone'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('addSupModalOverlay').style.display='flex';
+  setTimeout(()=>document.getElementById('newSupName').focus(),80);
+}
+function closeAddSupplierModal(){document.getElementById('addSupModalOverlay').style.display='none';}
+document.getElementById('addSupModalOverlay').addEventListener('click',function(e){if(e.target===this)closeAddSupplierModal();});
+
+async function submitNewSupplier(){
+  const name=document.getElementById('newSupName').value.trim();
+  const email=document.getElementById('newSupEmail').value.trim();
+  const phone=document.getElementById('newSupPhone').value.trim();
+  if(!name||!email){showToast('Name and email are required','error');return;}
+  const {ok,data}=await apiFetch('/manager/api/suppliers/add',{method:'POST',body:JSON.stringify({supplier_name:name,email,phone})});
+  if(ok&&data.status==='success'){
+    showToast(data.message,'success');closeAddSupplierModal();
+    const s=document.getElementById('poSupplier');
+    if(s&&data.supplier)s.innerHTML+=`<option value="${data.supplier.supplier_name}">${data.supplier.supplier_name}</option>`;
+  }else showToast(data.message||'Error','error');
+}
+loadPOs();
+</script>
+{% endblock %}
