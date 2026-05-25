@@ -1,5 +1,5 @@
 class config:
-    SQLALCHEMY_DATABASE_URI = 'postgresql://postgres:Sudheer45@localhost:5432/inventory'
+    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL')
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SECRET_KEY = "mysecret123"
 
